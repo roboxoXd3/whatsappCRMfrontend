@@ -69,13 +69,15 @@ export function ContactsList({ className }: ContactsListProps) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'lead':
-      case 'contacted':
+      case 'new':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-      case 'customer':
-      case 'converted':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      case 'inactive':
+      case 'contacted':
+        return 'bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-blue-200';
+      case 'qualified':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'negotiation':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
+      case 'lost':
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
@@ -225,20 +227,20 @@ export function ContactsList({ className }: ContactsListProps) {
                 <DropdownMenuItem onClick={() => setStatusFilter('all')}>
                   All Contacts
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('lead')}>
-                  Leads
+                <DropdownMenuItem onClick={() => setStatusFilter('new')}>
+                  New Leads
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setStatusFilter('contacted')}>
                   Contacted
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('customer')}>
-                  Customers
+                <DropdownMenuItem onClick={() => setStatusFilter('qualified')}>
+                  Qualified
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('converted')}>
-                  Converted
+                <DropdownMenuItem onClick={() => setStatusFilter('negotiation')}>
+                  Negotiation
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('inactive')}>
-                  Inactive
+                <DropdownMenuItem onClick={() => setStatusFilter('lost')}>
+                  Lost
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

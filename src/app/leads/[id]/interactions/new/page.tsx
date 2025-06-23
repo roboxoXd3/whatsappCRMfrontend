@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -20,21 +19,27 @@ interface Interaction {
   description: string;
 }
 
-export default function NewInteractionPage({ params }: { params: { id: string } }) {
+export default function NewInteractionPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [leadId, setLeadId] = useState<string>('');
   const [interaction, setInteraction] = useState<Interaction>({
     type: 'Call',
     description: ''
   });
+
+  // Extract params on component mount
+  useEffect(() => {
+    params.then(({ id }) => setLeadId(id));
+  }, [params]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
     try {
-      const response = await fetch(`/api/leads/${params.id}/interactions`, {
+      const response = await fetch(`/api/leads/${leadId}/interactions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -51,7 +56,7 @@ export default function NewInteractionPage({ params }: { params: { id: string } 
         description: 'Interaction added successfully'
       });
 
-      router.push(`/leads/${params.id}`);
+      router.push(`/leads/${leadId}`);
     } catch (error) {
       console.error('Error saving interaction:', error);
       toast({

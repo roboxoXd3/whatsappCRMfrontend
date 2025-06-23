@@ -13,14 +13,17 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuthStore();
 
+  // Temporarily bypass authentication in development mode
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!isDevelopment && !isLoading && !isAuthenticated) {
       router.push('/auth/login');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, router, isDevelopment]);
 
-  // Show loading screen while checking authentication
-  if (isLoading) {
+  // Show loading screen while checking authentication (only in production)
+  if (!isDevelopment && isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -39,11 +42,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  // If not authenticated, don't render children (redirect will happen)
-  if (!isAuthenticated) {
+  // If not authenticated and not in development, don't render children (redirect will happen)
+  if (!isDevelopment && !isAuthenticated) {
     return null;
   }
 
-  // Render protected content
+  // Render protected content (always in development, or when authenticated in production)
   return <>{children}</>;
 } 

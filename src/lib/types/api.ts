@@ -1,13 +1,13 @@
 // API Response Types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   status: 'success' | 'error';
   data?: T;
   message?: string;
   error_code?: string;
-  details?: any;
+  details?: unknown;
   timestamp?: string;
   pagination?: Pagination;
-  metadata?: any;
+  metadata?: unknown;
 }
 
 export interface Pagination {
@@ -91,6 +91,7 @@ export interface Conversation {
   last_message_role: 'user' | 'assistant';
   status: 'active' | 'closed' | 'pending';
   tags: string[];
+  unread_count?: number; // For WhatsApp-style unread message badges
 }
 
 export interface ConversationDetail {

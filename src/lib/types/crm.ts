@@ -11,7 +11,7 @@ export interface Contact {
   position?: string;
   source?: string;
   // API uses lead_status instead of status
-  lead_status: 'lead' | 'contacted' | 'customer' | 'converted' | 'inactive';
+  lead_status: 'new' | 'contacted' | 'qualified' | 'negotiation' | 'lost';
   lead_score: number;
   tags?: string[];
   created_at: string;
@@ -67,7 +67,7 @@ export interface Task {
 
 // Filter and pagination types
 export interface ContactFilters {
-  status?: 'lead' | 'customer' | 'inactive';
+  status?: 'new' | 'contacted' | 'qualified' | 'negotiation' | 'lost';
   tag?: string;
   search?: string;
 }
@@ -132,7 +132,7 @@ export interface CreateContactRequest {
   company?: string;
   position?: string;
   source?: string;
-  lead_status?: 'lead' | 'contacted' | 'customer' | 'converted' | 'inactive';
+  lead_status?: 'new' | 'contacted' | 'qualified' | 'negotiation' | 'lost';
   tags?: string[];
   notes?: string;
 }
@@ -143,7 +143,7 @@ export interface UpdateContactRequest {
   company?: string;
   position?: string;
   source?: string;
-  lead_status?: 'lead' | 'contacted' | 'customer' | 'converted' | 'inactive';
+  lead_status?: 'new' | 'contacted' | 'qualified' | 'negotiation' | 'lost';
   tags?: string[];
   notes?: string;
 }

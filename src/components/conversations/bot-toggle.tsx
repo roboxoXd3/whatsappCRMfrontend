@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Bot, User, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bot, User, Loader2, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -11,7 +11,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useBotStatus, useBotToggle } from '@/hooks/useBotToggle';
+import { useBotStatus, useBotToggle, botToggleKeys } from '@/hooks/useBotToggle';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 
 interface BotToggleProps {
@@ -24,17 +25,39 @@ interface BotToggleProps {
 
 export function BotToggle({ 
   conversationId, 
-  phoneNumber, 
-  contactName,
   className,
   variant = 'compact'
-}: BotToggleProps) {
+}: Omit<BotToggleProps, 'phoneNumber'>) {
   const [showSuccess, setShowSuccess] = useState(false);
-  const { data: botStatus, isLoading: isLoadingStatus, error: statusError } = useBotStatus(conversationId);
-  const { toggleBotByPhone, isToggling, error: toggleError } = useBotToggle();
+  const [forceRender, setForceRender] = useState(0);
+  const queryClient = useQueryClient();
+  const { 
+    data: botStatus, 
+    isLoading: isLoadingStatus, 
+    error: statusError,
+    refetch: refetchBotStatus 
+  } = useBotStatus(conversationId);
+  const { 
+    toggleBotByConversation, 
+    isToggling, 
+    error: toggleError 
+  } = useBotToggle();
 
-  // Clean phone number for API call
-  const cleanPhoneNumber = phoneNumber.replace('_s_whatsapp_net', '').replace(/\D/g, '');
+  // We use conversation ID for toggle, but keep phone number for display
+  // const cleanPhoneNumber = phoneNumber.replace('_s_whatsapp_net', '').replace(/\D/g, '');
+
+  // Watch for successful mutations and refresh status
+  useEffect(() => {
+    if (toggleBotByConversation.isSuccess && !isToggling) {
+      console.log('🔄 Mutation successful, refreshing bot status...');
+      // Small delay to ensure backend has processed the change
+      setTimeout(() => {
+        refetchBotStatus();
+      }, 500);
+    }
+  }, [toggleBotByConversation.isSuccess, isToggling, refetchBotStatus]);
+
+
 
   const handleToggle = async (enabled: boolean) => {
     try {
@@ -42,17 +65,46 @@ export function BotToggle({
         ? 'Bot re-enabled by user' 
         : 'Human agent taking over conversation';
 
-      await toggleBotByPhone.mutateAsync({
-        phone_number: cleanPhoneNumber,
+      console.log('🔄 Toggling bot by conversation ID:', {
+        conversationId,
+        enabled,
+        currentStatus: botStatus?.bot_enabled,
+        reason
+      });
+
+      const result = await toggleBotByConversation.mutateAsync({
+        conversationId,
         enabled,
         reason
       });
+
+      console.log('✅ Toggle successful:', result);
+
+      // Force clear cache and refetch to ensure UI updates
+      console.log('🔄 Clearing cache and refetching bot status...');
+      queryClient.removeQueries({ queryKey: botToggleKeys.status(conversationId) });
+      await refetchBotStatus();
+      
+      // Force immediate re-render
+      setForceRender(prev => prev + 1);
+      
+      // Wait a bit and refetch again to ensure we get the updated data
+      setTimeout(async () => {
+        console.log('🔄 Second refetch to ensure data is fresh...');
+        queryClient.removeQueries({ queryKey: botToggleKeys.status(conversationId) });
+        await refetchBotStatus();
+        // Force re-render after data is fresh
+        setForceRender(prev => prev + 1);
+      }, 1000);
+
+
 
       // Show success feedback
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 2000);
     } catch (error) {
-      console.error('Failed to toggle bot:', error);
+      console.error('❌ Failed to toggle bot:', error);
+
     }
   };
 
@@ -74,17 +126,27 @@ export function BotToggle({
     );
   }
 
+  // Use actual status from API
   const isEnabled = botStatus?.bot_enabled ?? true;
   const statusText = botStatus?.status_text ?? (isEnabled ? 'Bot is active' : 'Human is handling');
 
+  // Debug logging
+  console.log('🔍 BotToggle render:', {
+    conversationId,
+    botStatusData: botStatus?.bot_enabled,
+    finalIsEnabled: isEnabled,
+    isToggling
+  });
+
   if (variant === 'compact') {
     return (
-      <TooltipProvider>
-        <div className={cn("flex items-center gap-2", className)}>
+      <TooltipProvider key={`tooltip-${conversationId}-${isEnabled}-${forceRender}`}>
+        <div className={cn("flex items-center gap-2", className)} key={`${conversationId}-${isEnabled}-${forceRender}`}>
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-2">
                 <Switch
+                  key={`switch-${conversationId}-${isEnabled}-${forceRender}`}
                   checked={isEnabled}
                   onCheckedChange={handleToggle}
                   disabled={isToggling}
@@ -133,6 +195,27 @@ export function BotToggle({
               </TooltipContent>
             </Tooltip>
           )}
+
+          {/* Manual refresh button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 p-0"
+                onClick={() => refetchBotStatus()}
+                disabled={isLoadingStatus}
+              >
+                <RefreshCw className={cn(
+                  "h-3 w-3 text-gray-400 hover:text-gray-600",
+                  isLoadingStatus && "animate-spin"
+                )} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Refresh status</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </TooltipProvider>
     );

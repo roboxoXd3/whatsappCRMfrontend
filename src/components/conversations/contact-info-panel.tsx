@@ -3,237 +3,199 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { 
+  X, 
   Phone, 
+  Video, 
   Mail, 
   Building, 
-  Clock, 
-  MessageCircle, 
+  MapPin, 
+  Calendar,
   Star,
-  Tag,
-  MoreHorizontal,
+  Plus,
+  Download,
   Edit,
-  Archive
+  User
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BotToggle } from './bot-toggle';
-import { ConversationDetail } from '@/lib/types/api';
-import { useUpdateConversationStatus } from '@/hooks/useConversations';
-import { cn } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Conversation } from '@/lib/types/api';
 
 interface ContactInfoPanelProps {
-  conversation: ConversationDetail;
-  className?: string;
+  conversation: Conversation;
+  onClose: () => void;
 }
 
-export function ContactInfoPanel({ conversation, className }: ContactInfoPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const updateStatusMutation = useUpdateConversationStatus();
-  
-  const { contact, metadata } = conversation;
-  
-  // Provide default metadata if not available
-  const defaultMetadata = {
-    total_messages: 0,
-    avg_response_time: 'Unknown',
-    last_activity: conversation.last_message_at || conversation.created_at,
-    sentiment: 'neutral',
-    lead_score: 50,
-  };
-  
-  const meta = metadata || defaultMetadata;
-
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment.toLowerCase()) {
-      case 'positive': return 'text-green-600 bg-green-100';
-      case 'negative': return 'text-red-600 bg-red-100';
-      case 'neutral': return 'text-gray-600 bg-gray-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
-
-  const getLeadScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600 bg-green-100';
-    if (score >= 60) return 'text-yellow-600 bg-yellow-100';
-    if (score >= 40) return 'text-orange-600 bg-orange-100';
-    return 'text-red-600 bg-red-100';
-  };
+export function ContactInfoPanel({ conversation, onClose }: ContactInfoPanelProps) {
+  const { contact } = conversation;
+  const [isEditing, setIsEditing] = useState(false);
 
   const formatPhoneNumber = (phone: string) => {
-    if (phone.startsWith('91') && phone.length > 10) {
-      return `+91 ${phone.slice(2, 7)} ${phone.slice(7)}`;
+    // Remove WhatsApp suffix and format
+    const cleanPhone = phone.replace('_s_whatsapp_net', '');
+    if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+      return `+91 ${cleanPhone.slice(2, 7)} ${cleanPhone.slice(7)}`;
     }
-    return phone;
+    return cleanPhone.startsWith('+') ? cleanPhone : `+${cleanPhone}`;
   };
 
-  const handleStatusChange = async (newStatus: 'active' | 'closed' | 'pending') => {
-    try {
-      await updateStatusMutation.mutateAsync({
-        conversationId: conversation.id,
-        status: newStatus,
-      });
-    } catch (error) {
-      console.error('Failed to update status:', error);
-    }
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   return (
-    <div className={cn("bg-white border-l border-gray-200", className)}>
+    <div className="h-full flex flex-col bg-white">
       {/* Header */}
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-900">Contact Info</h3>
-          <Button variant="ghost" size="sm">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </div>
+      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900">Contact Info</h2>
+        <Button variant="ghost" size="icon" onClick={onClose}>
+          <X className="h-5 w-5" />
+        </Button>
+      </div>
 
-        {/* Contact Name & Status */}
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {contact.name || 'Unknown Contact'}
-          </h2>
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Contact Avatar and Basic Info */}
+        <div className="p-6 text-center border-b border-gray-100">
+          <Avatar className="w-24 h-24 mx-auto mb-4">
+            <AvatarFallback className="text-2xl font-semibold bg-blue-100 text-blue-700">
+              {contact.name ? getInitials(contact.name) : <User className="w-8 h-8" />}
+            </AvatarFallback>
+          </Avatar>
           
-          <div className="flex items-center gap-2">
-            <Phone className="h-4 w-4 text-gray-400" />
-            <span className="text-sm text-gray-600">
-              {formatPhoneNumber(contact.phone_number)}
-            </span>
-          </div>
-
-          {contact.email && (
-            <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-gray-400" />
-              <span className="text-sm text-gray-600">{contact.email}</span>
-            </div>
-          )}
-
+          <h3 className="text-xl font-semibold text-gray-900 mb-1">
+            {contact.name || 'Unknown Contact'}
+          </h3>
+          
           {contact.company && (
-            <div className="flex items-center gap-2">
-              <Building className="h-4 w-4 text-gray-400" />
-              <span className="text-sm text-gray-600">{contact.company}</span>
-            </div>
+            <p className="text-sm text-gray-600 mb-3">{contact.company}</p>
           )}
-        </div>
-      </div>
 
-      {/* Bot Toggle Section */}
-      <div className="p-4 border-b">
-        <h4 className="font-medium text-gray-900 mb-3">Response Mode</h4>
-        <BotToggle
-          conversationId={conversation.id}
-          phoneNumber={contact.phone_number}
-          contactName={contact.name}
-          variant="full"
-        />
-      </div>
-
-      {/* Conversation Metrics */}
-      <div className="p-4 border-b">
-        <h4 className="font-medium text-gray-900 mb-3">Conversation Stats</h4>
-        
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="h-4 w-4 text-gray-400" />
-              <span className="text-sm text-gray-600">Total Messages</span>
-            </div>
-            <span className="text-sm font-medium">{meta.total_messages}</span>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-400" />
-              <span className="text-sm text-gray-600">Avg Response</span>
-            </div>
-            <span className="text-sm font-medium">{meta.avg_response_time}</span>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Last Activity</span>
-            <span className="text-sm text-gray-500">
-              {formatDistanceToNow(new Date(meta.last_activity), { addSuffix: true })}
-            </span>
+          {/* Action Buttons */}
+          <div className="flex justify-center gap-3 mb-4">
+            <Button size="sm" className="flex items-center gap-2">
+              <Phone className="w-4 h-4" />
+              Call
+            </Button>
+            <Button size="sm" variant="outline" className="flex items-center gap-2">
+              <Video className="w-4 h-4" />
+              Video
+            </Button>
+            <Button size="sm" variant="outline" className="flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              Email
+            </Button>
           </div>
         </div>
-      </div>
 
-      {/* Sentiment & Lead Score */}
-      <div className="p-4 border-b">
-        <h4 className="font-medium text-gray-900 mb-3">Analysis</h4>
-        
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Sentiment</span>
-            <Badge 
-              variant="secondary" 
-              className={cn("text-xs", getSentimentColor(meta.sentiment))}
-            >
-              {meta.sentiment}
-            </Badge>
+        {/* Contact Information */}
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-gray-900">Contact Information</h4>
+            <Button variant="ghost" size="sm" onClick={() => setIsEditing(!isEditing)}>
+              <Edit className="w-4 h-4" />
+            </Button>
           </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Lead Score</span>
-            <div className="flex items-center gap-2">
-              <Badge 
-                variant="secondary"
-                className={cn("text-xs", getLeadScoreColor(meta.lead_score))}
-              >
-                {meta.lead_score}/100
-              </Badge>
-              <div className="flex">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={cn(
-                      "h-3 w-3",
-                      i < Math.floor(meta.lead_score / 20)
-                        ? "text-yellow-400 fill-current"
-                        : "text-gray-300"
-                    )}
-                  />
-                ))}
+          
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Phone className="w-4 h-4 text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  {formatPhoneNumber(contact.phone_number)}
+                </p>
+                <p className="text-xs text-gray-500">Mobile</p>
               </div>
             </div>
+            
+            {contact.email && (
+              <div className="flex items-center gap-3">
+                <Mail className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{contact.email}</p>
+                  <p className="text-xs text-gray-500">Email</p>
+                </div>
+              </div>
+            )}
+            
+            {contact.company && (
+              <div className="flex items-center gap-3">
+                <Building className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{contact.company}</p>
+                  <p className="text-xs text-gray-500">Company</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="p-4">
-        <h4 className="font-medium text-gray-900 mb-3">Quick Actions</h4>
-        
-        <div className="space-y-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full justify-start"
-            onClick={() => handleStatusChange('closed')}
-            disabled={updateStatusMutation.isPending}
-          >
-            <Archive className="h-4 w-4 mr-2" />
-            Close Conversation
-          </Button>
+        {/* Conversation Stats */}
+        <div className="p-4 border-b border-gray-100">
+          <h4 className="font-medium text-gray-900 mb-3">Conversation Stats</h4>
           
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full justify-start"
-          >
-            <Edit className="h-4 w-4 mr-2" />
-            Edit Contact
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full justify-start"
-          >
-            <Tag className="h-4 w-4 mr-2" />
-            Add Tags
-          </Button>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Total Messages</span>
+              <span className="text-sm font-medium text-gray-900">
+                {conversation.message_count || 0}
+              </span>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Status</span>
+              <Badge variant="outline" className="text-xs">
+                {conversation.status || 'Active'}
+              </Badge>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Last Activity</span>
+              <span className="text-xs text-gray-500">
+                {conversation.last_message_at 
+                  ? formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })
+                  : 'No activity'
+                }
+              </span>
+            </div>
+
+            {contact.lead_status && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Lead Status</span>
+                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                  {contact.lead_status}
+                </Badge>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Tags - Only show if they exist in the conversation */}
+        {conversation.tags && conversation.tags.length > 0 && (
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium text-gray-900">Tags</h4>
+              <Button variant="ghost" size="sm" className="text-blue-600">
+                <Plus className="w-4 h-4 mr-1" />
+                Add
+              </Button>
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              {conversation.tags.map((tag) => (
+                <Badge key={tag} variant="secondary" className="text-xs">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

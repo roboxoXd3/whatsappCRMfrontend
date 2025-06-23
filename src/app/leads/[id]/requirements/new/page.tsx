@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,22 +21,28 @@ interface Requirement {
   status: string;
 }
 
-export default function NewRequirementPage({ params }: { params: { id: string } }) {
+export default function NewRequirementPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [leadId, setLeadId] = useState<string>('');
   const [requirement, setRequirement] = useState<Requirement>({
     title: '',
     description: '',
     status: 'Pending'
   });
 
+  // Extract params on component mount
+  useEffect(() => {
+    params.then(({ id }) => setLeadId(id));
+  }, [params]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
     try {
-      const response = await fetch(`/api/leads/${params.id}/requirements`, {
+      const response = await fetch(`/api/leads/${leadId}/requirements`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -53,7 +59,7 @@ export default function NewRequirementPage({ params }: { params: { id: string } 
         description: 'Requirement added successfully'
       });
 
-      router.push(`/leads/${params.id}`);
+      router.push(`/leads/${leadId}`);
     } catch (error) {
       console.error('Error saving requirement:', error);
       toast({

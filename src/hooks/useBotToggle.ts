@@ -1,7 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
-
-const API_BASE = 'https://whatsapp-ai-chatbot-production-bc92.up.railway.app';
+import { apiClient } from '@/lib/api/client';
 
 // Types for bot toggle API
 interface BotStatusSummary {
@@ -64,22 +63,19 @@ export const botToggleKeys = {
 };
 
 export function useBotToggle() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Get bot status summary
   const getBotStatusSummary = useQuery({
     queryKey: botToggleKeys.summary(),
     queryFn: async (): Promise<BotStatusSummary> => {
-      const response = await fetch(`${API_BASE}/api/bot/status-summary`);
-      const data = await response.json();
+      const response = await apiClient.get('/api/bot/status-summary');
       
-      if (data.status === 'error') {
-        throw new Error(data.message);
+      if (response.status === 'error') {
+        throw new Error(response.message || 'Failed to get bot status');
       }
       
-      return data.data;
+      return response.data;
     },
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // 1 minute
@@ -87,14 +83,13 @@ export function useBotToggle() {
 
   // Get bot status for specific conversation
   const getBotStatus = useCallback(async (conversationId: string): Promise<BotStatus> => {
-    const response = await fetch(`${API_BASE}/api/bot/status/${conversationId}`);
-    const data = await response.json();
+    const response = await apiClient.get(`/api/bot/status/${conversationId}`);
     
-    if (data.status === 'error') {
-      throw new Error(data.message);
+    if (response.status === 'error') {
+      throw new Error(response.message || 'Failed to get bot status');
     }
     
-    return data.data;
+    return response.data;
   }, []);
 
   // Toggle bot by conversation ID
@@ -108,24 +103,16 @@ export function useBotToggle() {
       enabled?: boolean; 
       reason?: string; 
     }): Promise<BotToggleResponse> => {
-      const response = await fetch(`${API_BASE}/api/bot/toggle/${conversationId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          enabled,
-          reason
-        })
+      const response = await apiClient.post(`/api/bot/toggle/${conversationId}`, {
+        enabled,
+        reason
       });
-
-      const data = await response.json();
       
-      if (data.status === 'error') {
-        throw new Error(data.message);
+      if (response.status === 'error') {
+        throw new Error(response.message || 'Failed to toggle bot');
       }
       
-      return data.data;
+      return response.data;
     },
     onSuccess: () => {
       // Invalidate and refetch bot status queries
@@ -136,25 +123,39 @@ export function useBotToggle() {
   // Toggle bot by phone number (recommended)
   const toggleBotByPhone = useMutation({
     mutationFn: async (request: ToggleByPhoneRequest): Promise<BotToggleResponse> => {
-      const response = await fetch(`${API_BASE}/api/bot/toggle-by-phone`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request)
-      });
-
-      const data = await response.json();
+      const response = await apiClient.post('/api/bot/toggle-by-phone', request);
       
-      if (data.status === 'error') {
-        throw new Error(data.message);
+      if (response.status === 'error') {
+        throw new Error(response.message || 'Failed to toggle bot');
       }
       
-      return data.data;
+      return response.data;
     },
-    onSuccess: () => {
-      // Invalidate and refetch bot status queries
+    onSuccess: (data) => {
+      console.log('🔄 Bot toggle successful, invalidating cache...', data);
+      
+      // Invalidate all bot toggle queries
       queryClient.invalidateQueries({ queryKey: botToggleKeys.all });
+      
+      // Also invalidate the specific conversation status if we have the conversation_id
+      if (data.conversation_id) {
+        queryClient.invalidateQueries({ 
+          queryKey: botToggleKeys.status(data.conversation_id) 
+        });
+        
+        // Force refetch the specific conversation status
+        queryClient.refetchQueries({ 
+          queryKey: botToggleKeys.status(data.conversation_id) 
+        });
+      }
+      
+      // Force refetch of bot status summary
+      queryClient.refetchQueries({ 
+        queryKey: botToggleKeys.summary() 
+      });
+      
+      // Also remove from cache and refetch to force fresh data
+      queryClient.removeQueries({ queryKey: botToggleKeys.all });
     },
   });
 
@@ -168,21 +169,13 @@ export function useBotToggle() {
       reason?: string;
       timestamp: string;
     }> => {
-      const response = await fetch(`${API_BASE}/api/bot/bulk-toggle`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request)
-      });
-
-      const data = await response.json();
+      const response = await apiClient.post('/api/bot/bulk-toggle', request);
       
-      if (data.status === 'error') {
-        throw new Error(data.message);
+      if (response.status === 'error') {
+        throw new Error(response.message || 'Failed to bulk toggle bot');
       }
       
-      return data.data;
+      return response.data;
     },
     onSuccess: () => {
       // Invalidate and refetch bot status queries
@@ -211,16 +204,18 @@ export function useBotStatus(conversationId: string) {
   return useQuery({
     queryKey: botToggleKeys.status(conversationId),
     queryFn: async (): Promise<BotStatus> => {
-      const response = await fetch(`${API_BASE}/api/bot/status/${conversationId}`);
-      const data = await response.json();
+      console.log('🔍 Fetching bot status for conversation:', conversationId);
+      const response = await apiClient.get(`/api/bot/status/${conversationId}`);
       
-      if (data.status === 'error') {
-        throw new Error(data.message);
+      if (response.status === 'error') {
+        throw new Error(response.message || 'Failed to get bot status');
       }
       
-      return data.data;
+      console.log('✅ Bot status fetched:', response.data);
+      return response.data;
     },
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // 1 minute
+    staleTime: 5 * 1000, // 5 seconds (shorter for more responsive UI)
+    refetchInterval: 30 * 1000, // 30 seconds
+    enabled: !!conversationId, // Only run if conversationId exists
   });
 } 

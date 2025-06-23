@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 
-const BACKEND_URL = 'https://whatsapp-ai-chatbot-production-bc92.up.railway.app';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const response = await fetch(`${BACKEND_URL}/api/leads/${params.id}`);
+    const response = await fetch(`${BACKEND_URL}/api/leads/${id}`);
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
@@ -18,11 +19,12 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const body = await request.json();
-    const response = await fetch(`${BACKEND_URL}/api/leads/${params.id}`, {
+    const response = await fetch(`${BACKEND_URL}/api/leads/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -39,10 +41,11 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const response = await fetch(`${BACKEND_URL}/api/leads/${params.id}`, {
+    const response = await fetch(`${BACKEND_URL}/api/leads/${id}`, {
       method: 'DELETE'
     });
     const data = await response.json();

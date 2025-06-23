@@ -14,30 +14,32 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 // import { Separator } from '@/components/ui/separator';
-import { CustomerContextCard } from './customer-context-card';
 import { BotToggle } from './bot-toggle';
 import { MessageBubble } from './message-bubble';
 import { useConversationDetail } from '@/hooks/useConversationDetail';
 import { useSendMessage } from '@/hooks/useConversations';
 import { Conversation } from '@/lib/types/api';
 import { cn } from '@/lib/utils';
+import { ContactInfoPanel } from './contact-info-panel';
 
 interface ConversationDetailProps {
   conversation: Conversation;
   onBack?: () => void;
+  onToggleContactInfo?: () => void;
+  showContactInfo?: boolean;
   className?: string;
 }
 
 export function ConversationDetail({ 
   conversation, 
   onBack,
+  onToggleContactInfo,
+  showContactInfo,
   className 
 }: ConversationDetailProps) {
   const [message, setMessage] = useState('');
-  const [showCustomerInfo, setShowCustomerInfo] = useState(true);
 
   const { contact } = conversation;
   
@@ -91,72 +93,72 @@ export function ConversationDetail({
   };
 
   return (
-    <div className={cn("flex h-full bg-gray-50", className)}>
+    <div className={cn("flex h-full bg-white", className)}>
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Chat Header */}
-        <Card className="rounded-none border-x-0 border-t-0 shadow-sm bg-white">
-          <CardHeader className="py-5 px-8 border-b flex flex-row items-center justify-between">
-            <div className="flex items-center gap-6 min-w-0">
-              {onBack && (
-                <Button variant="ghost" size="icon" onClick={onBack} className="mr-2">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              )}
-              <div className="flex items-center gap-5 min-w-0">
-                <div className="h-14 w-14 rounded-full bg-blue-100 flex items-center justify-center shadow text-2xl font-bold text-blue-700">
-                  {contact.name?.charAt(0)?.toUpperCase() || '?'}
-                </div>
-                <div className="min-w-0">
-                  <h2 className="font-bold text-xl text-gray-900 truncate">{contact.name || 'Unknown Contact'}</h2>
-                  <div className="flex items-center gap-3 flex-wrap mt-1">
-                    <span className="text-gray-500 text-sm truncate">{formatPhoneNumber(contact.phone_number)}</span>
-                    {contact.company && (
-                      <>
-                        <span className="text-gray-300">|</span>
-                        <span className="text-blue-700 font-medium text-sm truncate">{contact.company}</span>
-                      </>
-                    )}
-                    {contact.lead_status && (
-                      <Badge variant="outline" className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 border-blue-200">
+        <div className="bg-[#f0f2f5] border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4 min-w-0">
+            {onBack && (
+              <Button variant="ghost" size="icon" onClick={onBack}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            )}
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center text-lg font-medium text-gray-600">
+                {contact.name?.charAt(0)?.toUpperCase() || '?'}
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-medium text-[#111b21] truncate">{contact.name || 'Unknown Contact'}</h2>
+                <div className="flex items-center gap-2 text-xs text-[#667781]">
+                  <span className="truncate">{formatPhoneNumber(contact.phone_number)}</span>
+                  {contact.company && (
+                    <>
+                      <span>•</span>
+                      <span className="truncate">{contact.company}</span>
+                    </>
+                  )}
+                  {contact.lead_status && (
+                    <>
+                      <span>•</span>
+                      <Badge variant="outline" className="text-xs px-1 py-0 h-4 bg-blue-50 text-blue-700 border-blue-200">
                         {contact.lead_status}
                       </Badge>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <BotToggle 
-                conversationId={conversation.id}
-                phoneNumber={contact.phone_number}
-                contactName={contact.name}
-                variant="compact"
-              />
-              <Button variant="ghost" size="icon" title="Call">
-                <Phone className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="icon" title="Video Call">
-                <Video className="h-5 w-5" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                title="Show Customer Info"
-                onClick={() => setShowCustomerInfo(!showCustomerInfo)}
-              >
-                <Info className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="icon" title="More">
-                <MoreVertical className="h-5 w-5" />
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
+          </div>
+          <div className="flex items-center gap-2">
+            <BotToggle 
+              conversationId={conversation.id}
+              variant="compact"
+            />
+            <Button variant="ghost" size="icon" className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="Call">
+              <Phone className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="Video Call">
+              <Video className="h-5 w-5" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]"
+              title="Show Customer Info"
+              onClick={onToggleContactInfo}
+            >
+              <Info className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="More">
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
 
         {/* Messages Area */}
-        <div className="flex-1 p-4 overflow-y-auto">
-          <div className="max-w-4xl mx-auto space-y-4">
+        <div className="flex-1 p-4 overflow-y-auto bg-[#efeae2]" style={{backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxwYXR0ZXJuIGlkPSJhIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgcGF0dGVyblRyYW5zZm9ybT0icm90YXRlKDEyKSI+CiAgICAgIDxwYXRoIGQ9Im0wIDBoMzAwdjMwMGgtMzAweiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMDIiLz4KICAgIDwvcGF0dGVybj4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNhKSIvPgo8L3N2Zz4=')"}}>
+          <div className="max-w-4xl mx-auto space-y-2">
             {isLoading ? (
               <div className="text-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
@@ -169,9 +171,9 @@ export function ConversationDetail({
                   Try Again
                 </Button>
               </div>
-            ) : conversationDetail?.messages && conversationDetail.messages.length > 0 ? (
+            ) : conversationDetail?.data?.messages && conversationDetail.data.messages.length > 0 ? (
               <>
-                {conversationDetail.messages.map((msg, index) => (
+                {conversationDetail.data.messages.map((msg, index) => (
                   <MessageBubble 
                     key={`${msg.timestamp}-${index}`} 
                     message={msg}
@@ -193,116 +195,61 @@ export function ConversationDetail({
         </div>
 
         {/* Message Input */}
-        <Card className="rounded-none border-x-0 border-b-0">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm">
-                <Paperclip className="h-4 w-4" />
-              </Button>
+        <div className="bg-[#f0f2f5] p-4 border-t border-gray-200">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]">
+              <Paperclip className="h-5 w-5" />
+            </Button>
+            
+            <div className="flex-1 flex items-center bg-white rounded-lg border border-gray-200">
+              <Input
+                placeholder="Type a message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+                disabled={sendMessageMutation.isPending}
+              />
               
-              <div className="flex-1 flex items-center gap-2">
-                <Input
-                  placeholder="Type a message..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                  className="flex-1"
-                  disabled={sendMessageMutation.isPending}
-                />
-                
-                <Button variant="ghost" size="sm">
-                  <Smile className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              <Button 
-                onClick={handleSendMessage}
-                disabled={!message.trim() || sendMessageMutation.isPending}
-                size="sm"
-              >
-                {sendMessageMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
+              <Button variant="ghost" size="icon" className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]">
+                <Smile className="h-5 w-5" />
               </Button>
             </div>
+            
+            <Button 
+              onClick={handleSendMessage}
+              disabled={!message.trim() || sendMessageMutation.isPending}
+              size="icon"
+              className="h-10 w-10 bg-[#00a884] hover:bg-[#00a884]/90 text-white"
+            >
+              {sendMessageMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
 
-            {/* Error message */}
-            {sendMessageMutation.error && (
-              <div className="mt-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
-                {sendMessageMutation.error instanceof Error 
-                  ? sendMessageMutation.error.message 
-                  : 'Failed to send message. Please try again.'
-                }
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          {/* Error message */}
+          {sendMessageMutation.error && (
+            <div className="mt-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+              {sendMessageMutation.error instanceof Error 
+                ? sendMessageMutation.error.message 
+                : 'Failed to send message. Please try again.'
+              }
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Customer Info Sidebar */}
-      {showCustomerInfo && (
+      {showContactInfo && (
         <>
           <div className="w-px bg-gray-200"></div>
-          <aside className="bg-gray-50 border-l flex flex-col overflow-y-auto items-center py-10 px-6 pr-12" style={{ minWidth: 320, maxWidth: 420 }}>
-            <div className="w-full flex flex-col items-center gap-8">
-              <CustomerContextCard 
-                phoneNumber={contact.phone_number}
-                enrichedContact={contact}
-                className="border-0 shadow-lg mb-10 max-w-[380px] w-full mx-auto rounded-2xl bg-white py-8 px-8"
-              />
-              <Card className="bg-white rounded-2xl shadow-lg border-0 w-full max-w-[380px] mx-auto mb-10 py-8 px-8">
-                <CardHeader className="pb-2 px-0">
-                  <h3 className="font-bold text-lg text-gray-800">Conversation Stats</h3>
-                </CardHeader>
-                <CardContent className="space-y-4 px-0">
-                  <div className="flex justify-between text-base">
-                    <span className="text-gray-500">Total Messages</span>
-                    <span className="font-semibold text-gray-900">
-                      {conversationDetail?.messages?.length || conversation.message_count}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-base">
-                    <span className="text-gray-500">Status</span>
-                    <Badge variant="outline" className="text-xs px-2 py-0.5 rounded">
-                      {conversation.status}
-                    </Badge>
-                  </div>
-                  {conversationDetail?.last_message_at && (
-                    <div className="flex justify-between text-base">
-                      <span className="text-gray-500">Last Activity</span>
-                      <span className="font-medium text-xs text-gray-700">
-                        {new Date(conversationDetail.last_message_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-base">
-                    <span className="text-gray-500">Last Activity</span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(conversation.last_message_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-              {conversation.tags && conversation.tags.length > 0 && (
-                <Card className="bg-white rounded-2xl shadow-lg border-0 w-full max-w-[380px] mx-auto py-8 px-8">
-                  <CardHeader className="pb-2 px-0">
-                    <h3 className="font-bold text-lg text-gray-800">Tags</h3>
-                  </CardHeader>
-                  <CardContent className="px-0">
-                    <div className="flex flex-wrap gap-2">
-                      {conversation.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs px-2 py-0.5 rounded">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </aside>
+          <ContactInfoPanel 
+            conversation={conversation}
+            onClose={() => onToggleContactInfo?.()}
+          />
         </>
       )}
     </div>

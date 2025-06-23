@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { conversationsService } from '@/lib/api/conversations';
+import { conversationsService, CRMContact } from '@/lib/api/conversations';
 import { ConversationFilters, ConversationSearchParams } from '@/lib/types/conversations';
 import { Conversation, ConversationDetail, SendMessageRequest } from '@/lib/types/api';
 
@@ -11,6 +11,7 @@ export const conversationKeys = {
   details: () => [...conversationKeys.all, 'detail'] as const,
   detail: (id: string) => [...conversationKeys.details(), id] as const,
   search: (params: ConversationSearchParams) => [...conversationKeys.all, 'search', params] as const,
+  crmSearch: (query: string) => [...conversationKeys.all, 'crm-search', query] as const,
 };
 
 /**
@@ -46,6 +47,18 @@ export function useConversationSearch(searchParams: ConversationSearchParams) {
     queryKey: conversationKeys.search(searchParams),
     queryFn: () => conversationsService.searchConversations(searchParams),
     enabled: !!searchParams.q && searchParams.q.length > 2,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Hook to search CRM contacts
+ */
+export function useCRMContactSearch(searchQuery: string, limit: number = 20) {
+  return useQuery({
+    queryKey: conversationKeys.crmSearch(searchQuery),
+    queryFn: () => conversationsService.searchCRMContacts(searchQuery, limit),
+    enabled: !!searchQuery && searchQuery.length > 2,
     staleTime: 5 * 60 * 1000,
   });
 }

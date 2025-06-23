@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const BACKEND_URL = 'https://whatsapp-ai-chatbot-production-bc92.up.railway.app';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

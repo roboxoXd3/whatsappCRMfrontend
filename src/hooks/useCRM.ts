@@ -320,8 +320,8 @@ export function useCRMStats() {
 
     // Calculate contact stats
     const totalContacts = contacts.length;
-    const totalLeads = contacts.filter(c => c.lead_status === 'lead' || c.lead_status === 'contacted').length;
-    const totalCustomers = contacts.filter(c => c.lead_status === 'customer' || c.lead_status === 'converted').length;
+    const totalLeads = contacts.filter(c => c.lead_status === 'new' || c.lead_status === 'contacted' || c.lead_status === 'qualified').length;
+    const totalCustomers = contacts.filter(c => c.lead_status === 'qualified' || c.lead_status === 'negotiation').length;
 
     // Calculate deal stats
     const totalDeals = deals.length;

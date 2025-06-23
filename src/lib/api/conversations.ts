@@ -11,6 +11,30 @@ import {
   ConversationSearchParams,
 } from '@/lib/types/conversations';
 
+// Add CRM Contact interface
+export interface CRMContact {
+  id: string;
+  phone_number: string;
+  display_phone: string;
+  name: string;
+  email?: string;
+  company?: string;
+  position?: string;
+  lead_status: string;
+  lead_score: number;
+  source?: string;
+  notes?: string;
+  last_contacted_at?: string;
+  next_follow_up_at?: string;
+  created_at: string;
+}
+
+export interface ConversationsParams {
+  limit?: number;
+  offset?: number;
+  status?: string;
+}
+
 /**
  * Conversations API Service
  * Handles all conversation-related API calls
@@ -49,6 +73,18 @@ export class ConversationsService {
     if (searchParams.offset) params.append('offset', searchParams.offset.toString());
     
     return apiClient.get<Conversation[]>('/api/conversation/search', Object.fromEntries(params));
+  }
+
+  /**
+   * Search CRM contacts by name, phone number, company, or email
+   */
+  async searchCRMContacts(searchQuery: string, limit: number = 20, offset: number = 0): Promise<ApiResponse<CRMContact[]>> {
+    const params = new URLSearchParams();
+    params.append('q', searchQuery);
+    params.append('limit', limit.toString());
+    params.append('offset', offset.toString());
+    
+    return apiClient.get<CRMContact[]>('/api/crm/contacts/search', Object.fromEntries(params));
   }
 
   /**
@@ -94,43 +130,28 @@ export class ConversationsService {
 // Export singleton instance
 export const conversationsService = new ConversationsService();
 
-export const conversationsApi = {
-  // Get conversation details with messages
-  getConversationDetail: async (conversationId: string): Promise<ConversationDetail> => {
-    try {
-      console.log(`🔍 Fetching conversation details for: ${conversationId}`);
-      
-      const response = await apiClient.get<ConversationDetail>(
-        `/api/conversation/${conversationId}`
-      );
-      
-      console.log('📊 Conversation Detail Response:', response);
-      
-      if (response.status === 'success' && response.data) {
-        return response.data;
-      } else {
-        throw new Error(response.message || 'Failed to fetch conversation details');
-      }
-    } catch (error: any) {
-      console.error('❌ Error fetching conversation details:', error);
-      throw error;
-    }
-  },
+// Static API class for hooks
+export class ConversationsAPI {
+  // Get conversations with optional filters
+  static async getConversations(params: ConversationsParams = {}): Promise<ApiResponse<Conversation[]>> {
+    const searchParams = new URLSearchParams();
+    if (params.limit) searchParams.append('limit', params.limit.toString());
+    if (params.offset) searchParams.append('offset', params.offset.toString());
+    if (params.status) searchParams.append('status', params.status);
 
-  // Get all conversations (existing functionality)
-  getConversations: async (params?: { limit?: number; offset?: number; status?: string }) => {
-    try {
-      // Use the unique endpoint to eliminate duplicate phone numbers
-      const response = await apiClient.get('/api/conversations/unique', params);
-      
-      if (response.status === 'success' && response.data) {
-        return response.data;
-      } else {
-        throw new Error(response.message || 'Failed to fetch conversations');
-      }
-    } catch (error: any) {
-      console.error('❌ Error fetching conversations:', error);
-      throw error;
-    }
+    return apiClient.get<Conversation[]>(`/api/conversations/unique?${searchParams.toString()}`);
   }
-}; 
+
+  // Get single conversation by ID
+  static async getConversation(conversationId: string): Promise<ApiResponse<Conversation>> {
+    return apiClient.get<Conversation>(`/api/conversation/${conversationId}`);
+  }
+
+  // Get detailed conversation with full message history
+  static async getConversationDetail(conversationId: string): Promise<ApiResponse<ConversationDetail>> {
+    return apiClient.get<ConversationDetail>(`/api/conversation/${conversationId}`);
+  }
+}
+
+// Export for easier imports
+export const conversationsApi = ConversationsAPI; 

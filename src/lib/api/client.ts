@@ -35,7 +35,10 @@ class ApiClient {
         
         // Log requests in development
         if (process.env.NODE_ENV === 'development') {
-          console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+          console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+          if (config.data) {
+            console.log('📤 Request Data:', config.data);
+          }
         }
         
         return config;
@@ -57,7 +60,7 @@ class ApiClient {
       (error) => {
         // Log errors in development
         if (process.env.NODE_ENV === 'development') {
-          console.error(`❌ API Error:`, error.response?.status, error.response?.data || error.message);
+          console.error(`❌ API Error:`, error.response?.status, error.config?.url, error.response?.data || error.message);
         }
 
         // Handle common errors

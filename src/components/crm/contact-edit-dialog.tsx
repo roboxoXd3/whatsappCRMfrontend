@@ -39,7 +39,7 @@ export function ContactEditDialog({ contact, open, onOpenChange }: ContactEditDi
     company: '',
     position: '',
     source: '',
-    lead_status: 'lead' as 'lead' | 'contacted' | 'customer' | 'converted' | 'inactive',
+    lead_status: 'new' as 'new' | 'contacted' | 'qualified' | 'negotiation' | 'lost',
     notes: '',
     tags: [] as string[],
   });
@@ -55,6 +55,11 @@ export function ContactEditDialog({ contact, open, onOpenChange }: ContactEditDi
   useEffect(() => {
     if (open) {
       if (contact) {
+        // Editing existing contact - ensure valid lead_status
+        const validStatus = ['new', 'contacted', 'qualified', 'negotiation', 'lost'].includes(contact.lead_status) 
+          ? contact.lead_status 
+          : 'new';
+        
         setFormData({
           name: contact.name || '',
           phone_number: contact.phone_number || '',
@@ -62,11 +67,12 @@ export function ContactEditDialog({ contact, open, onOpenChange }: ContactEditDi
           company: contact.company || '',
           position: contact.position || '',
           source: contact.source || '',
-          lead_status: contact.lead_status || 'lead',
+          lead_status: validStatus as 'new' | 'contacted' | 'qualified' | 'negotiation' | 'lost',
           notes: contact.notes || '',
           tags: contact.tags || [],
         });
       } else {
+        // Creating new contact - always start with 'new'
         setFormData({
           name: '',
           phone_number: '',
@@ -74,11 +80,24 @@ export function ContactEditDialog({ contact, open, onOpenChange }: ContactEditDi
           company: '',
           position: '',
           source: '',
-          lead_status: 'lead',
+          lead_status: 'new',
           notes: '',
           tags: [],
         });
       }
+    } else {
+      // Dialog closed - reset to default
+      setFormData({
+        name: '',
+        phone_number: '',
+        email: '',
+        company: '',
+        position: '',
+        source: '',
+        lead_status: 'new',
+        notes: '',
+        tags: [],
+      });
     }
   }, [open, contact]);
 
@@ -143,6 +162,7 @@ export function ContactEditDialog({ contact, open, onOpenChange }: ContactEditDi
           tags: formData.tags.length > 0 ? formData.tags : undefined,
         };
 
+        console.log('Creating contact with data:', createData);
         await createContactMutation.mutateAsync(createData);
         alert('Contact created successfully');
       }
@@ -233,11 +253,11 @@ export function ContactEditDialog({ contact, open, onOpenChange }: ContactEditDi
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="lead">Lead</SelectItem>
+                  <SelectItem value="new">New Lead</SelectItem>
                   <SelectItem value="contacted">Contacted</SelectItem>
-                  <SelectItem value="customer">Customer</SelectItem>
-                  <SelectItem value="converted">Converted</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="qualified">Qualified</SelectItem>
+                  <SelectItem value="negotiation">Negotiation</SelectItem>
+                  <SelectItem value="lost">Lost</SelectItem>
                 </SelectContent>
               </Select>
             </div>

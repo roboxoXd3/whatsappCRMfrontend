@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCRMStats } from '@/hooks/useCRM';
-import { cn } from '@/lib/utils';
 
 // Import CRM components (we'll create these next)
 import { ContactsList } from '@/components/crm/contacts-list';
@@ -168,7 +167,7 @@ export default function CRMPage() {
                 <div className="text-center">
                   <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-lg font-medium">Deals Pipeline Coming Soon</p>
-                  <p className="text-sm">We're building the deals management interface</p>
+                  <p className="text-sm">We&apos;re building the deals management interface</p>
                 </div>
               </div>
               {/* <DealsList /> */}
@@ -189,7 +188,7 @@ export default function CRMPage() {
                 <div className="text-center">
                   <CheckSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-lg font-medium">Task Management Coming Soon</p>
-                  <p className="text-sm">We're building the task management interface</p>
+                  <p className="text-sm">We&apos;re building the task management interface</p>
                 </div>
               </div>
               {/* <TasksList /> */}
