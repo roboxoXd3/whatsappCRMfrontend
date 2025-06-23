@@ -2,20 +2,22 @@ import React from 'react';
 import { UserDetailCard } from '@/components/crm/UserDetailCard';
 import { notFound } from 'next/navigation';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+
 async function fetchUser(id: string) {
-  const res = await fetch(`https://whatsapp-ai-chatbot-production-bc92.up.railway.app/api/crm/user/${id}`);
+  const res = await fetch(`${API_BASE}/api/crm/user/${id}`);
   if (!res.ok) return null;
   return res.json();
 }
 
 async function fetchStats(id: string) {
-  const res = await fetch(`https://whatsapp-ai-chatbot-production-bc92.up.railway.app/api/crm/user/${id}/stats`);
+  const res = await fetch(`${API_BASE}/api/crm/user/${id}/stats`);
   if (!res.ok) return null;
   return res.json();
 }
 
 async function fetchActivity(id: string) {
-  const res = await fetch(`https://whatsapp-ai-chatbot-production-bc92.up.railway.app/api/crm/user/${id}/activity`);
+  const res = await fetch(`${API_BASE}/api/crm/user/${id}/activity`);
   if (!res.ok) return [];
   return res.json();
 }

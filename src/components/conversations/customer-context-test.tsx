@@ -40,7 +40,8 @@ export function CustomerContextTest() {
       
       // Test the API directly first
       console.log('🔍 Testing API directly...');
-      const directApiResponse = await fetch(`https://whatsapp-ai-chatbot-production-bc92.up.railway.app/api/customer-context/${cleanPhoneNumber}`);
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const directApiResponse = await fetch(`${API_BASE}/api/customer-context/${cleanPhoneNumber}`);
       const directApiData = await directApiResponse.json();
       console.log('📊 Direct API Response:', directApiData);
       
