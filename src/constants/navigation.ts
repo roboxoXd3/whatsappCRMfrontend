@@ -11,6 +11,7 @@ import {
   Target,
   TrendingUp,
   Bell,
+  Key,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -87,6 +88,14 @@ export const secondaryNavigation: NavigationItem[] = [
     href: '/settings',
     icon: Settings,
     description: 'Application preferences',
+    children: [
+      {
+        name: 'API Keys',
+        href: '/settings/api-keys',
+        icon: Key,
+        description: 'Manage OpenAI and WhatsApp API keys',
+      },
+    ],
   },
 ];
 
@@ -128,6 +137,7 @@ export const breadcrumbLabels: Record<string, string> = {
   campaigns: 'Campaigns',
   analytics: 'Analytics',
   settings: 'Settings',
+  'api-keys': 'API Keys',
   notifications: 'Notifications',
   new: 'New',
   edit: 'Edit',
