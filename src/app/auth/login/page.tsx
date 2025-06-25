@@ -35,25 +35,41 @@ export default function LoginPage() {
         return;
       }
 
-      // Simulate API call - Replace with actual authentication
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock successful login
-      const mockUser = {
-        id: '1',
-        name: 'Admin User',
-        email: formData.email,
-        role: 'admin',
-      };
-      
-      const mockToken = 'mock-jwt-token-' + Date.now();
-      
-      login(mockUser, mockToken);
-      router.push('/dashboard');
+      // Call login API
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const response = await fetch(`${apiUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Successful login - extract user data and token
+        const user = {
+          id: data.user.user_id,
+          name: `${data.user.first_name} ${data.user.last_name}`,
+          email: data.user.email,
+          role: 'user', // Default role for now
+          company: data.user.company_name,
+          workspace: data.user.workspace_slug,
+        };
+        
+        login(user, data.token);
+        router.push('/dashboard');
+      } else {
+        setErrors({ general: data.error || 'Login failed. Please try again.' });
+      }
       
     } catch (error) {
       console.error('Login error:', error);
-      setErrors({ general: 'Login failed. Please try again.' });
+      setErrors({ general: 'Network error. Please check your connection and try again.' });
     } finally {
       setLoading(false);
     }
@@ -184,7 +200,7 @@ export default function LoginPage() {
           <p className="text-sm text-gray-600">
             Don&apos;t have an account?{' '}
             <Link href="/auth/register" className="font-medium text-blue-600 hover:text-blue-500">
-              Contact administrator
+              Create account
             </Link>
           </p>
           <p className="mt-2 text-xs text-gray-500">
