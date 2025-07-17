@@ -30,6 +30,10 @@ export function ConversationItem({
   
   // Format the enriched contact data for display
   const getDisplayName = () => {
+    // Priority: verified_name > name > company > formatted phone
+    if (contact.verified_name) {
+      return contact.verified_name;
+    }
     if (contact.name && contact.name !== contact.phone_number) {
       return contact.name;
     }
@@ -104,6 +108,11 @@ export function ConversationItem({
             <h3 className="font-semibold text-gray-900 truncate text-sm">
               {getDisplayName()}
             </h3>
+            {contact.is_business_account && (
+              <Badge variant="outline" className="text-xs px-1 py-0 h-4 bg-green-50 text-green-700 border-green-200">
+                Business
+              </Badge>
+            )}
             <div className="flex items-center gap-1 flex-wrap">
               <Badge 
                 variant="outline" 

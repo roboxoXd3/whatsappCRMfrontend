@@ -49,7 +49,7 @@ export interface SystemStatus {
 // Message Types
 export interface Message {
   id?: string; // Sometimes not included in API response
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'human';
   content: string;
   timestamp: string;
   status?: 'sent' | 'delivered' | 'read' | 'failed'; // Sometimes not included
@@ -80,6 +80,13 @@ export interface Contact {
   lead_score?: number;
   position?: string;
   crm_summary?: string;
+  // New WASender fields for contact sync
+  verified_name?: string;
+  profile_image_url?: string;
+  whatsapp_status?: string;
+  is_business_account?: boolean;
+  wasender_sync_status?: 'not_synced' | 'syncing' | 'synced' | 'error';
+  display_phone?: string; // Formatted phone number for display
 }
 
 export interface Conversation {

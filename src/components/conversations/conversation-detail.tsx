@@ -10,7 +10,8 @@ import {
   Send,
   Paperclip,
   Smile,
-  Loader2
+  Loader2,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 // import { Separator } from '@/components/ui/separator';
 import { BotToggle } from './bot-toggle';
 import { MessageBubble } from './message-bubble';
+import { DeliveryStatsPanel } from './delivery-stats-panel';
 import { useConversationDetail } from '@/hooks/useConversationDetail';
 import { useSendMessage } from '@/hooks/useConversations';
 import { Conversation } from '@/lib/types/api';
@@ -40,6 +42,7 @@ export function ConversationDetail({
   className 
 }: ConversationDetailProps) {
   const [message, setMessage] = useState('');
+  const [showDeliveryStats, setShowDeliveryStats] = useState(false);
 
   const { contact } = conversation;
   
@@ -97,7 +100,8 @@ export function ConversationDetail({
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Chat Header */}
-        <div className="bg-[#f0f2f5] border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        <div className="bg-[#f0f2f5] border-b border-gray-200 px-4 py-3">
+          <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 min-w-0">
             {onBack && (
               <Button variant="ghost" size="icon" onClick={onBack}>
@@ -105,11 +109,26 @@ export function ConversationDetail({
               </Button>
             )}
             <div className="flex items-center gap-3 min-w-0">
-              <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center text-lg font-medium text-gray-600">
-                {contact.name?.charAt(0)?.toUpperCase() || '?'}
+              <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center text-lg font-medium text-gray-600 overflow-hidden">
+                {contact.profile_image_url ? (
+                  <img 
+                    src={contact.profile_image_url} 
+                    alt={contact.verified_name || contact.name || 'Contact'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span>{(contact.verified_name || contact.name)?.charAt(0)?.toUpperCase() || '?'}</span>
+                )}
               </div>
               <div className="min-w-0">
-                <h2 className="font-medium text-[#111b21] truncate">{contact.name || 'Unknown Contact'}</h2>
+                <h2 className="font-medium text-[#111b21] truncate">
+                  {contact.verified_name || contact.name || 'Unknown Contact'}
+                  {contact.is_business_account && (
+                    <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                      Business
+                    </span>
+                  )}
+                </h2>
                 <div className="flex items-center gap-2 text-xs text-[#667781]">
                   <span className="truncate">{formatPhoneNumber(contact.phone_number)}</span>
                   {contact.company && (
@@ -130,12 +149,21 @@ export function ConversationDetail({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <BotToggle 
-              conversationId={conversation.id}
-              variant="compact"
-            />
-            <Button variant="ghost" size="icon" className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="Call">
+                      <div className="flex items-center gap-2">
+              <BotToggle 
+                conversationId={conversation.id}
+                variant="compact"
+              />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" 
+                title="Delivery Statistics"
+                onClick={() => setShowDeliveryStats(!showDeliveryStats)}
+              >
+                <BarChart3 className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="Call">
               <Phone className="h-5 w-5" />
             </Button>
             <Button variant="ghost" size="icon" className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="Video Call">
@@ -152,8 +180,20 @@ export function ConversationDetail({
             </Button>
             <Button variant="ghost" size="icon" className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="More">
               <MoreVertical className="h-5 w-5" />
-            </Button>
+                          </Button>
+            </div>
           </div>
+          
+          {/* Delivery Stats Panel (collapsible) */}
+          {showDeliveryStats && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <DeliveryStatsPanel 
+                conversationId={conversation.id}
+                variant="compact"
+                className="bg-white rounded-lg p-3 shadow-sm"
+              />
+            </div>
+          )}
         </div>
 
         {/* Messages Area */}
@@ -175,9 +215,17 @@ export function ConversationDetail({
               <>
                 {conversationDetail.data.messages.map((msg, index) => (
                   <MessageBubble 
-                    key={`${msg.timestamp}-${index}`} 
-                    message={msg}
+                    key={msg.id || `${msg.timestamp}-${index}`} 
+                    message={{
+                      ...msg,
+                      id: msg.id || `${msg.timestamp}-${index}`,
+                      status: msg.status || 'sent',
+                      message_id: undefined,
+                      timestamps: undefined,
+                      metadata: undefined
+                    }}
                     className="mb-4"
+                    showDetailedStatus={false}
                   />
                 ))}
               </>

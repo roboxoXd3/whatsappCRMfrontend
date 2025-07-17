@@ -64,17 +64,34 @@ export function ContactInfoPanel({ conversation, onClose }: ContactInfoPanelProp
         {/* Contact Avatar and Basic Info */}
         <div className="p-6 text-center border-b border-gray-100">
           <Avatar className="w-24 h-24 mx-auto mb-4">
-            <AvatarFallback className="text-2xl font-semibold bg-blue-100 text-blue-700">
-              {contact.name ? getInitials(contact.name) : <User className="w-8 h-8" />}
-            </AvatarFallback>
+            {contact.profile_image_url ? (
+              <img 
+                src={contact.profile_image_url} 
+                alt={contact.verified_name || contact.name || 'Contact'}
+                className="w-full h-full object-cover rounded-full"
+              />
+            ) : (
+              <AvatarFallback className="text-2xl font-semibold bg-blue-100 text-blue-700">
+                {contact.verified_name || contact.name ? getInitials(contact.verified_name || contact.name) : <User className="w-8 h-8" />}
+              </AvatarFallback>
+            )}
           </Avatar>
           
           <h3 className="text-xl font-semibold text-gray-900 mb-1">
-            {contact.name || 'Unknown Contact'}
+            {contact.verified_name || contact.name || 'Unknown Contact'}
+            {contact.is_business_account && (
+              <span className="ml-2 text-sm bg-green-100 text-green-700 px-2 py-1 rounded">
+                Business
+              </span>
+            )}
           </h3>
           
           {contact.company && (
             <p className="text-sm text-gray-600 mb-3">{contact.company}</p>
+          )}
+          
+          {contact.whatsapp_status && (
+            <p className="text-xs text-gray-500 italic mb-3">"{contact.whatsapp_status}"</p>
           )}
 
           {/* Action Buttons */}

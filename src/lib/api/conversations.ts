@@ -9,6 +9,9 @@ import {
 import {
   ConversationFilters,
   ConversationSearchParams,
+  BotStatus,
+  MessageStatusUpdate,
+  ConversationStatusSummary,
 } from '@/lib/types/conversations';
 
 // Add CRM Contact interface
@@ -35,6 +38,17 @@ export interface ConversationsParams {
   status?: string;
 }
 
+// Enhanced send message response with message ID
+export interface EnhancedSendMessageResponse {
+  status: string;
+  message: string;
+  recipient: string;
+  message_id: string; // Keep required like original
+  timestamp: string;
+  delivery_status?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  whatsapp_message_id?: string; // Additional field for WASender message ID
+}
+
 /**
  * Conversations API Service
  * Handles all conversation-related API calls
@@ -56,10 +70,17 @@ export class ConversationsService {
   }
 
   /**
-   * Fetch detailed conversation with full message history
+   * Fetch detailed conversation with full message history and enhanced status data
    */
   async getConversationDetail(conversationId: string): Promise<ApiResponse<ConversationDetail>> {
     return apiClient.get<ConversationDetail>(`/api/conversation/${conversationId}`);
+  }
+
+  /**
+   * Get conversation status summary including delivery stats
+   */
+  async getConversationStatusSummary(conversationId: string): Promise<ApiResponse<ConversationStatusSummary>> {
+    return apiClient.get<ConversationStatusSummary>(`/api/conversation/${conversationId}/status`);
   }
 
   /**
@@ -88,10 +109,10 @@ export class ConversationsService {
   }
 
   /**
-   * Send a message to a specific phone number
+   * Send a message to a specific phone number with enhanced response
    */
-  async sendMessage(messageData: SendMessageRequest): Promise<ApiResponse<SendMessageResponse>> {
-    return apiClient.post<SendMessageResponse>('/send-message', messageData);
+  async sendMessage(messageData: SendMessageRequest): Promise<ApiResponse<EnhancedSendMessageResponse>> {
+    return apiClient.post<EnhancedSendMessageResponse>('/send-message', messageData);
   }
 
   /**
@@ -124,6 +145,78 @@ export class ConversationsService {
    */
   async addConversationTags(conversationId: string, tags: string[]): Promise<ApiResponse<any>> {
     return apiClient.patch(`/api/conversation/${conversationId}/tags`, { tags });
+  }
+
+  // ========================================================================
+  // NEW ENHANCED FEATURES FROM PHASE 1
+  // ========================================================================
+
+  /**
+   * Get bot status for a specific conversation
+   */
+  async getBotStatus(conversationId: string): Promise<ApiResponse<BotStatus>> {
+    return apiClient.get<BotStatus>(`/api/conversation/${conversationId}/bot-status`);
+  }
+
+  /**
+   * Toggle bot status for a conversation
+   */
+  async toggleBotStatus(conversationId: string, enabled: boolean): Promise<ApiResponse<BotStatus>> {
+    return apiClient.patch<BotStatus>(`/api/conversation/${conversationId}/bot-status`, { 
+      enabled 
+    });
+  }
+
+  /**
+   * Get message status updates for a conversation
+   */
+  async getMessageStatusUpdates(conversationId: string, since?: string): Promise<ApiResponse<MessageStatusUpdate[]>> {
+    const params = new URLSearchParams();
+    if (since) params.append('since', since);
+    
+    return apiClient.get<MessageStatusUpdate[]>(
+      `/api/conversation/${conversationId}/message-status${params.toString() ? '?' + params.toString() : ''}`
+    );
+  }
+
+  /**
+   * Update message status manually (for testing or admin purposes)
+   */
+  async updateMessageStatus(
+    conversationId: string, 
+    messageId: string, 
+    status: 'sent' | 'delivered' | 'read'
+  ): Promise<ApiResponse<any>> {
+    return apiClient.patch(`/api/conversation/${conversationId}/message/${messageId}/status`, {
+      status
+    });
+  }
+
+  /**
+   * Get webhook events for debugging
+   */
+  async getWebhookEvents(conversationId: string, limit: number = 50): Promise<ApiResponse<any[]>> {
+    return apiClient.get(`/api/conversation/${conversationId}/webhook-events?limit=${limit}`);
+  }
+
+  /**
+   * Retry failed message
+   */
+  async retryFailedMessage(conversationId: string, messageId: string): Promise<ApiResponse<EnhancedSendMessageResponse>> {
+    return apiClient.post<EnhancedSendMessageResponse>(`/api/conversation/${conversationId}/message/${messageId}/retry`);
+  }
+
+  /**
+   * Get delivery statistics for a conversation
+   */
+  async getDeliveryStats(conversationId: string): Promise<ApiResponse<{
+    total_sent: number;
+    total_delivered: number;
+    total_read: number;
+    delivery_rate: number;
+    read_rate: number;
+  }>> {
+    return apiClient.get(`/api/conversation/${conversationId}/delivery-stats`);
   }
 }
 

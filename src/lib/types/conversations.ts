@@ -33,14 +33,33 @@ export interface ConversationDetail {
     sentiment: 'positive' | 'neutral' | 'negative';
     lead_score: number;
   };
+  bot_enabled?: boolean; // Whether bot is active for this conversation
+  unread_count?: number; // Number of unread messages
+  delivery_stats?: {
+    total_sent: number;
+    total_delivered: number;
+    total_read: number;
+    delivery_rate: number;
+  };
 }
 
 export interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'human';
   content: string;
   timestamp: string;
-  status: 'sent' | 'delivered' | 'read' | 'failed';
+  status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  message_id?: string; // WhatsApp message ID from WASender
+  timestamps?: {
+    sent_at?: string;
+    delivered_at?: string;
+    read_at?: string;
+  };
+  metadata?: {
+    is_from_bot?: boolean;
+    customer_context_used?: boolean;
+    response_time_ms?: number;
+  };
 }
 
 // Conversation-specific filter and search types
@@ -69,4 +88,26 @@ export interface SendMessageResponse {
   recipient: string;
   message_id: string;
   timestamp: string;
+}
+
+// New types for enhanced features
+export interface BotStatus {
+  enabled: boolean;
+  last_updated: string;
+  updated_by?: string;
+}
+
+export interface MessageStatusUpdate {
+  message_id: string;
+  phone_number: string;
+  status: 'sent' | 'delivered' | 'read';
+  timestamp: string;
+}
+
+export interface ConversationStatusSummary {
+  total_messages: number;
+  unread_messages: number;
+  last_message_status: 'sent' | 'delivered' | 'read' | 'failed';
+  bot_enabled: boolean;
+  response_time_avg: number;
 } 

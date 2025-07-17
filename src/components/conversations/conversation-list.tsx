@@ -98,6 +98,10 @@ export function ConversationList({
   };
 
   const getContactDisplayName = (contact: any) => {
+    // Priority: verified_name > name > company > formatted phone
+    if (contact.verified_name) {
+      return contact.verified_name;
+    }
     if (contact.name && contact.name !== contact.phone_number) {
       return contact.name;
     }
@@ -187,9 +191,17 @@ export function ConversationList({
               {/* Avatar */}
               <div className="relative">
                 <Avatar className="w-12 h-12">
-                  <AvatarFallback className="bg-gray-200 text-gray-700 font-medium">
-                    {getInitials(displayName)}
-                  </AvatarFallback>
+                  {conversation.contact.profile_image_url ? (
+                    <img 
+                      src={conversation.contact.profile_image_url} 
+                      alt={displayName}
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  ) : (
+                    <AvatarFallback className="bg-gray-200 text-gray-700 font-medium">
+                      {getInitials(displayName)}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
                 {/* Online status indicator */}
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
