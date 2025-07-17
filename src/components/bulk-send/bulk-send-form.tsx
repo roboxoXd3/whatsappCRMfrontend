@@ -219,7 +219,8 @@ export function BulkSendForm() {
     setIsFormattingMessage(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:5001/api/bulk-send/format-message', {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const response = await fetch(`${baseURL}/api/bulk-send/format-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -256,7 +257,8 @@ export function BulkSendForm() {
 
     try {
       // Call the new bulk send API endpoint
-      const response = await fetch('http://127.0.0.1:5001/api/bulk-send/send', {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const response = await fetch(`${baseURL}/api/bulk-send/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
