@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Bell,
   Key,
+  Send,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -67,6 +68,12 @@ export const mainNavigation: NavigationItem[] = [
     href: '/campaigns',
     icon: Megaphone,
     description: 'Bulk messaging and automation',
+  },
+  {
+    name: 'Bulk Send',
+    href: '/bulk-send',
+    icon: Send,
+    description: 'Send messages to multiple contacts',
   },
   {
     name: 'Analytics',
@@ -135,6 +142,7 @@ export const breadcrumbLabels: Record<string, string> = {
   deals: 'Deals',
   tasks: 'Tasks',
   campaigns: 'Campaigns',
+  'bulk-send': 'Bulk Send',
   analytics: 'Analytics',
   settings: 'Settings',
   'api-keys': 'API Keys',

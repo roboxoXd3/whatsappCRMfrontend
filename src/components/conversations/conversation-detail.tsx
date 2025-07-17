@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, 
   MoreVertical, 
@@ -43,6 +43,11 @@ export function ConversationDetail({
 }: ConversationDetailProps) {
   const [message, setMessage] = useState('');
   const [showDeliveryStats, setShowDeliveryStats] = useState(false);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  
+  // Refs for scroll management
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { contact } = conversation;
   
@@ -56,6 +61,46 @@ export function ConversationDetail({
 
   // Message sending mutation
   const sendMessageMutation = useSendMessage();
+
+  // Scroll management functions
+  const scrollToBottom = (smooth = true) => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: smooth ? 'smooth' : 'instant',
+        block: 'end' 
+      });
+    }
+  };
+
+  const handleScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    // Check if user is near the bottom (within 100px)
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    
+    // Update scrolling state
+    setIsUserScrolling(!isNearBottom);
+  };
+
+  // Auto-scroll effects
+  useEffect(() => {
+    // Scroll to bottom when conversation changes or messages load
+    if (conversationDetail?.data?.messages && conversationDetail.data.messages.length > 0) {
+      // Use timeout to ensure DOM is updated
+      setTimeout(() => {
+        scrollToBottom(!isUserScrolling); // Smooth scroll only if user isn't manually scrolling
+      }, 100);
+    }
+  }, [conversationDetail?.data?.messages?.length, conversation.id]);
+
+  useEffect(() => {
+    // Scroll to bottom when new messages arrive (only if user is at bottom)
+    if (!isUserScrolling && conversationDetail?.data?.messages && conversationDetail.data.messages.length > 0) {
+      scrollToBottom(true);
+    }
+  }, [conversationDetail?.data?.messages, isUserScrolling]);
 
   const handleSendMessage = async () => {
     if (!message.trim() || sendMessageMutation.isPending) return;
@@ -76,6 +121,9 @@ export function ConversationDetail({
         // Clear input and refresh conversation
         setMessage('');
         refetch();
+        
+        // Auto-scroll to bottom after sending message
+        setTimeout(() => scrollToBottom(true), 200);
         
         // Show success message
         console.log('Message sent successfully:', response);
@@ -197,7 +245,11 @@ export function ConversationDetail({
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 p-4 overflow-y-auto bg-[#efeae2]" style={{backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxwYXR0ZXJuIGlkPSJhIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgcGF0dGVyblRyYW5zZm9ybT0icm90YXRlKDEyKSI+CiAgICAgIDxwYXRoIGQ9Im0wIDBoMzAwdjMwMGgtMzAweiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMDIiLz4KICAgIDwvcGF0dGVybj4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNhKSIvPgo8L3N2Zz4=')"}}>
+        <div 
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 p-4 overflow-y-auto bg-[#efeae2] scrollbar-thin" 
+          style={{backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxwYXR0ZXJuIGlkPSJhIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgcGF0dGVyblRyYW5zZm9ybT0icm90YXRlKDEyKSI+CiAgICAgIDxwYXRoIGQ9Im0wIDBoMzAwdjMwMGgtMzAweiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMDIiLz4KICAgIDwvcGF0dGVybj4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNhKSIvPgo8L3N2Zz4=')"}}>
           <div className="max-w-4xl mx-auto space-y-2">
             {isLoading ? (
               <div className="text-center py-8">
@@ -228,6 +280,8 @@ export function ConversationDetail({
                     showDetailedStatus={false}
                   />
                 ))}
+                {/* Invisible div for scroll targeting */}
+                <div ref={messagesEndRef} className="h-1" />
               </>
             ) : (
               <div className="text-center py-8">
