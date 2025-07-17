@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Send, Users, Upload, FileText, Plus, X, CheckCircle, AlertCircle, Clock, FileCheck, AlertTriangle } from 'lucide-react';
+import { Send, Users, Upload, FileText, Plus, X, CheckCircle, AlertCircle, Clock, FileCheck, AlertTriangle, Sparkles } from 'lucide-react';
 import Papa from 'papaparse';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -28,6 +28,7 @@ export function BulkSendForm() {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvUploadStatus, setCsvUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
+  const [isFormattingMessage, setIsFormattingMessage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddContact = () => {
@@ -209,6 +210,44 @@ export function BulkSendForm() {
     }
   };
 
+  const handleFormatMessage = async () => {
+    if (!message.trim()) {
+      alert('Please enter a message to format');
+      return;
+    }
+
+    setIsFormattingMessage(true);
+
+    try {
+      const response = await fetch('http://127.0.0.1:5001/api/bulk-send/format-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message.trim(),
+          tone: 'professional',
+          purpose: 'marketing'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status === 'success') {
+        setMessage(result.data.formatted_message);
+        console.log('Message formatted successfully');
+      } else {
+        console.error('Message formatting failed:', result.message);
+        alert('Failed to format message. Please try again.');
+      }
+    } catch (error) {
+      console.error('Message formatting error:', error);
+      alert('Failed to format message. Please check your connection.');
+    } finally {
+      setIsFormattingMessage(false);
+    }
+  };
+
   const handleBulkSend = async () => {
     if (!message.trim() || selectedContacts.length === 0) return;
 
@@ -258,9 +297,30 @@ export function BulkSendForm() {
       <div className="space-y-6">
         {/* Message Composition */}
         <Card className="p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText className="h-5 w-5 text-blue-600" />
-            <h3 className="text-lg font-semibold">Compose Message</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-600" />
+              <h3 className="text-lg font-semibold">Compose Message</h3>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleFormatMessage}
+              disabled={isLoading || isFormattingMessage || !message.trim()}
+              className="text-purple-600 border-purple-200 hover:bg-purple-50"
+            >
+              {isFormattingMessage ? (
+                <>
+                  <Clock className="h-4 w-4 mr-2 animate-spin" />
+                  Formatting...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  AI Format
+                </>
+              )}
+            </Button>
           </div>
           
           <div className="space-y-4">
