@@ -13,6 +13,7 @@ import {
   Bell,
   Key,
   Send,
+  UsersRound,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -74,6 +75,18 @@ export const mainNavigation: NavigationItem[] = [
     href: '/bulk-send',
     icon: Send,
     description: 'Send messages to multiple contacts',
+  },
+  {
+    name: 'Group Creation',
+    href: '/group-creation',
+    icon: UsersRound,
+    description: 'Create WhatsApp groups from contacts',
+  },
+  {
+    name: 'Scheduled Messages',
+    href: '/scheduled-messages',
+    icon: Calendar,
+    description: 'View and manage scheduled messages',
   },
   {
     name: 'Analytics',
@@ -143,6 +156,8 @@ export const breadcrumbLabels: Record<string, string> = {
   tasks: 'Tasks',
   campaigns: 'Campaigns',
   'bulk-send': 'Bulk Send',
+  'group-creation': 'Group Creation',
+  'scheduled-messages': 'Scheduled Messages',
   analytics: 'Analytics',
   settings: 'Settings',
   'api-keys': 'API Keys',
