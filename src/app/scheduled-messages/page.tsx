@@ -20,7 +20,8 @@ import {
   Loader2,
   Eye,
   MessageSquare,
-  X
+  X,
+  ArrowLeft
 } from 'lucide-react';
 
 interface ScheduledMessage {
@@ -230,6 +231,16 @@ export default function ScheduledMessagesPage() {
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="mb-8">
+        <div className="flex items-center gap-4 mb-4">
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = '/'}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Home
+          </Button>
+        </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Scheduled Messages</h1>
         <p className="text-gray-600">View, track, and manage your scheduled WhatsApp messages</p>
       </div>
