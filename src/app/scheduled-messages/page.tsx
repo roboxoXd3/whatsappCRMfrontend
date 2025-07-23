@@ -41,10 +41,30 @@ interface ScheduledMessage {
   error_message?: string;
 }
 
+interface Group {
+  id: string;
+  group_jid: string;
+  name: string;
+  status: string;
+  member_count: number;
+  img_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 interface ScheduledMessagesResponse {
   success: boolean;
   data: {
     scheduled_messages: ScheduledMessage[];
+    total: number;
+  };
+  error?: string;
+}
+
+interface GroupsResponse {
+  success: boolean;
+  data: {
+    groups: Group[];
     total: number;
   };
   error?: string;
@@ -58,6 +78,7 @@ interface CancelResponse {
 
 export default function ScheduledMessagesPage() {
   const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -66,6 +87,21 @@ export default function ScheduledMessagesPage() {
 
   // API base URL from environment
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+
+  // Load groups for mapping group JIDs to names
+  const loadGroups = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/group-messaging/groups`);
+      const data: GroupsResponse = await response.json();
+
+      if (data.success) {
+        setGroups(data.data.groups);
+      }
+    } catch (error) {
+      // Silently handle group loading error - it's not critical
+      console.error('Failed to load groups:', error);
+    }
+  };
 
   // Load scheduled messages
   const loadScheduledMessages = async () => {
@@ -114,11 +150,24 @@ export default function ScheduledMessagesPage() {
     }
   };
 
+  // Get group name by JID
+  const getGroupName = (groupJid: string): string => {
+    const group = groups.find(g => g.group_jid === groupJid);
+    return group?.name || groupJid;
+  };
+
+  // Get group names for target groups
+  const getTargetGroupNames = (targetGroups: string[]): string[] => {
+    return targetGroups.map(jid => getGroupName(jid));
+  };
+
   // Filter messages based on search term
   const filteredMessages = scheduledMessages.filter(message => {
+    const groupNames = getTargetGroupNames(message.target_groups).join(' ');
     const matchesSearch = !searchTerm || 
       message.message_content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      message.campaign_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      message.campaign_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      groupNames.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || message.status === statusFilter;
     
@@ -174,6 +223,7 @@ export default function ScheduledMessagesPage() {
 
   // Load initial data
   useEffect(() => {
+    loadGroups();
     loadScheduledMessages();
   }, [statusFilter]);
 
@@ -197,7 +247,7 @@ export default function ScheduledMessagesPage() {
             {/* Search Input */}
             <div className="flex-1 min-w-64">
               <Input
-                placeholder="Search messages or campaigns..."
+                placeholder="Search messages, campaigns, or group names..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full"
@@ -223,7 +273,10 @@ export default function ScheduledMessagesPage() {
             {/* Refresh Button */}
             <Button
               variant="outline"
-              onClick={loadScheduledMessages}
+              onClick={() => {
+                loadGroups();
+                loadScheduledMessages();
+              }}
               disabled={isLoading}
             >
               {isLoading ? (
@@ -269,6 +322,7 @@ export default function ScheduledMessagesPage() {
               {filteredMessages.map((message) => {
                 const StatusIcon = getStatusIcon(message.status);
                 const canCancel = message.status === 'pending';
+                const targetGroupNames = getTargetGroupNames(message.target_groups);
 
                 return (
                   <div
@@ -313,7 +367,12 @@ export default function ScheduledMessagesPage() {
 
                             <div className="flex items-center gap-1">
                               <Users className="h-3 w-3" />
-                              <span>{message.target_groups.length} group{message.target_groups.length !== 1 ? 's' : ''}</span>
+                              <span>
+                                {targetGroupNames.length === 1 
+                                  ? targetGroupNames[0]
+                                  : `${targetGroupNames.length} groups`
+                                }
+                              </span>
                             </div>
 
                             {message.status === 'pending' && (
@@ -332,6 +391,17 @@ export default function ScheduledMessagesPage() {
                               </div>
                             )}
                           </div>
+
+                          {/* Show group names when multiple groups */}
+                          {targetGroupNames.length > 1 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {targetGroupNames.map((groupName, index) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  {groupName}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
 
                           {message.error_message && (
                             <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
@@ -427,7 +497,13 @@ export default function ScheduledMessagesPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Target Groups
                   </label>
-                  <p className="text-gray-900">{selectedMessage.target_groups.length} groups</p>
+                  <div className="space-y-1">
+                    {getTargetGroupNames(selectedMessage.target_groups).map((groupName, index) => (
+                      <Badge key={index} variant="outline" className="mr-1 mb-1">
+                        {groupName}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               </div>
 
