@@ -20,6 +20,12 @@ export function MessageBubble({
   const isUser = message.role === 'user';
   const isHuman = message.role === 'human';
   const isBot = message.metadata?.is_from_bot ?? (message.role === 'assistant');
+  
+  // Detect handover confirmation messages
+  const isHandoverMessage = isBot && (
+    message.content.includes('Bot mode: OFF') ||
+    message.content.includes('Human mode: ON')
+  );
 
   const formatTime = (timestamp: string) => {
     try {
@@ -104,6 +110,8 @@ export function MessageBubble({
             ? "bg-blue-500 text-white ml-auto" 
             : isHuman
             ? "bg-purple-500 text-white ml-auto"
+            : isHandoverMessage
+            ? "bg-amber-50 text-amber-800 border border-amber-200 mr-auto"
             : "bg-gray-100 text-gray-900 mr-auto"
         )}>
           <p className="text-sm leading-relaxed whitespace-pre-wrap">

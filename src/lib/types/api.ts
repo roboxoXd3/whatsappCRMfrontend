@@ -99,6 +99,7 @@ export interface Conversation {
   status: 'active' | 'closed' | 'pending';
   tags: string[];
   unread_count?: number; // For WhatsApp-style unread message badges
+  bot_enabled?: boolean; // Whether bot auto-responses are enabled for this conversation
 }
 
 export interface ConversationDetail {

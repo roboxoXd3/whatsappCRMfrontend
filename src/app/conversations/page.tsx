@@ -5,11 +5,16 @@ import { ConversationList } from '@/components/conversations/conversation-list';
 import { ConversationDetail } from '@/components/conversations/conversation-detail';
 import { NewConversationModal } from '@/components/conversations/new-conversation-modal';
 import { Conversation } from '@/lib/types/api';
+import { useConversations } from '@/hooks/useConversations';
+import { User, AlertTriangle } from 'lucide-react';
 
 export default function ConversationsPage() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [isNewConversationModalOpen, setIsNewConversationModalOpen] = useState(false);
   const [showContactInfo, setShowContactInfo] = useState(true);
+  
+  // Get conversations data to show handover requests
+  const { data: conversationsData } = useConversations();
 
   const handleConversationSelect = (conversation: Conversation) => {
     setSelectedConversation(conversation);
@@ -32,6 +37,11 @@ export default function ConversationsPage() {
     setShowContactInfo(!showContactInfo);
   };
 
+  // Filter conversations that need human attention (bot disabled)
+  const handoverRequests = conversationsData?.data?.filter(
+    (conv: Conversation) => conv.bot_enabled === false
+  ) || [];
+
   return (
     <div className="flex h-screen bg-white overflow-hidden">
       {/* Left Panel - Conversations List */}
@@ -44,7 +54,49 @@ export default function ConversationsPage() {
             </svg>
           </div>
           <h1 className="text-xl font-medium">Conversations</h1>
+          {handoverRequests.length > 0 && (
+            <div className="ml-auto flex items-center gap-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
+              <AlertTriangle className="h-4 w-4" />
+              <span>{handoverRequests.length} Human Request{handoverRequests.length !== 1 ? 's' : ''}</span>
+            </div>
+          )}
         </div>
+        
+        {/* Handover Requests Panel */}
+        {handoverRequests.length > 0 && (
+          <div className="bg-red-50 border-b border-red-200 p-3">
+            <div className="text-sm font-medium text-red-800 mb-2">
+              🚨 Pending Human Responses ({handoverRequests.length})
+            </div>
+            <div className="space-y-2 max-h-32 overflow-y-auto">
+              {handoverRequests.slice(0, 3).map((conversation) => (
+                <div 
+                  key={conversation.id}
+                  onClick={() => setSelectedConversation(conversation)}
+                  className="bg-white rounded border border-red-200 p-2 cursor-pointer hover:bg-red-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <User className="h-3 w-3 text-red-600" />
+                    <span className="font-medium text-sm text-red-800">
+                      {conversation.contact.name || 'Unknown Contact'}
+                    </span>
+                    <span className="text-xs text-red-600 ml-auto">
+                      Waiting for human
+                    </span>
+                  </div>
+                  <p className="text-xs text-red-700 mt-1 truncate">
+                    {conversation.last_message_preview}
+                  </p>
+                </div>
+              ))}
+              {handoverRequests.length > 3 && (
+                <div className="text-xs text-red-600 text-center">
+                  +{handoverRequests.length - 3} more requests
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         
         <ConversationList
           selectedConversationId={selectedConversation?.id}

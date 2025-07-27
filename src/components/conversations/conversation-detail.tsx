@@ -11,7 +11,9 @@ import {
   Paperclip,
   Smile,
   Loader2,
-  BarChart3
+  BarChart3,
+  User,
+  Bot
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -232,6 +234,50 @@ export function ConversationDetail({
             </div>
           </div>
           
+          {/* Human Mode Indicator */}
+          {conversation.bot_enabled === false && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-medium text-amber-800">
+                    Human Mode Active
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto h-6 px-2 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`/api/bot/return-to-bot/${conversation.id}`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            reason: 'Admin returned conversation to bot via UI',
+                            send_notification: true
+                          })
+                        });
+                        
+                        if (response.ok) {
+                          // Refresh the conversation to update bot status
+                          refetch();
+                        }
+                      } catch (error) {
+                        console.error('Failed to return to bot:', error);
+                      }
+                    }}
+                  >
+                    <Bot className="h-3 w-3 mr-1" />
+                    Return to Bot
+                  </Button>
+                </div>
+                <p className="text-xs text-amber-700 mt-1">
+                  Bot responses are disabled. A team member will respond shortly.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Delivery Stats Panel (collapsible) */}
           {showDeliveryStats && (
             <div className="mt-3 pt-3 border-t border-gray-200">
@@ -298,6 +344,21 @@ export function ConversationDetail({
 
         {/* Message Input */}
         <div className="bg-[#f0f2f5] p-4 border-t border-gray-200">
+          {/* Quick Action: Request Human Support */}
+          {conversation.bot_enabled !== false && (
+            <div className="mb-3">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-xs bg-white border-amber-200 text-amber-700 hover:bg-amber-50"
+                onClick={() => setMessage("I need to talk to a human")}
+              >
+                <User className="h-3 w-3 mr-1" />
+                Request Human Support
+              </Button>
+            </div>
+          )}
+          
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]">
               <Paperclip className="h-5 w-5" />

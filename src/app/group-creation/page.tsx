@@ -70,8 +70,18 @@ interface GroupCreationResponse {
       phone_number: string;
     }>;
     wasender_group_jid: string;
+    validation_summary?: {
+      missing_contacts_synced: number;
+      invalid_contacts: number;
+    };
   };
   error?: string;
+  details?: {
+    missing_contact_ids?: string[];
+    invalid_contacts?: string[];
+    sync_attempted?: boolean;
+    sync_performed?: boolean;
+  };
 }
 
 interface Group {
@@ -144,6 +154,49 @@ export default function GroupCreationPage() {
 
   // API base URL from environment
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+
+  // Manual contact sync state
+  const [isSyncingContacts, setIsSyncingContacts] = useState(false);
+
+  // Manual contact sync function (now efficient)
+  const syncContactsFromWasender = async () => {
+    setIsSyncingContacts(true);
+    try {
+      // Use the force-sync endpoint for manual sync (user explicitly requested it)
+      const response = await fetch(`${API_BASE}/api/group-messaging/contacts/force-sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        const syncResult = data.data.sync_result;
+        let message = `Full contact sync completed!`;
+        if (syncResult) {
+          message += `\n✅ New: ${syncResult.saved_new || 0}`;
+          message += `\n🔄 Updated: ${syncResult.updated_existing || 0}`;
+          message += `\n❌ Failed: ${syncResult.failed || 0}`;
+          message += `\n📊 Total processed: ${data.data.total_contacts_processed || 0}`;
+        }
+        if (data.data.warning) {
+          message += `\n⚠️ ${data.data.warning}`;
+        }
+        toast.success(message);
+        
+        // Refresh the contact search to show updated contacts
+        searchContacts(searchTerm);
+      } else {
+        toast.error('Failed to sync contacts from WASender API');
+      }
+    } catch (error) {
+      console.error('Contact sync error:', error);
+      toast.error('Failed to sync contacts. Please check your connection.');
+    } finally {
+      setIsSyncingContacts(false);
+    }
+  };
 
   // Search contacts
   const searchContacts = async (term: string = '', offset: number = 0) => {
@@ -377,6 +430,16 @@ export default function GroupCreationPage() {
 
     setIsCreatingGroup(true);
     try {
+      // Show validation summary before creating
+      const validContacts = selectedContacts.filter(c => c.phone_number && c.phone_number.trim());
+      const invalidContacts = selectedContacts.filter(c => !c.phone_number || !c.phone_number.trim());
+      
+      if (invalidContacts.length > 0) {
+        toast.error(`Found ${invalidContacts.length} contacts with invalid phone numbers. Please review your selection.`);
+        setIsCreatingGroup(false);
+        return;
+      }
+
       const response = await fetch(`${API_BASE}/api/group-messaging/groups/create-with-contacts`, {
         method: 'POST',
         headers: {
@@ -385,13 +448,27 @@ export default function GroupCreationPage() {
         body: JSON.stringify({
           group_name: groupName.trim(),
           contact_ids: selectedContacts.map(c => c.id),
+          auto_sync_missing: true, // Enable auto-sync for missing contacts
         }),
       });
 
       const data: GroupCreationResponse = await response.json();
 
       if (data.success) {
-        toast.success(`Group "${data.data.group.name}" created successfully with ${data.data.group.member_count} members`);
+        const validationSummary = data.data.validation_summary;
+        let successMessage = `Group "${data.data.group.name}" created successfully with ${data.data.group.member_count} members`;
+        
+        // Add validation details to success message
+                 if (validationSummary) {
+           if (validationSummary.missing_contacts_synced > 0) {
+             successMessage += `\n✅ Efficiently synced ${validationSummary.missing_contacts_synced} missing contacts (targeted sync)`;
+           }
+          if (validationSummary.invalid_contacts > 0) {
+            successMessage += `\n⚠️ Skipped ${validationSummary.invalid_contacts} contacts with invalid phone numbers`;
+          }
+        }
+        
+        toast.success(successMessage);
         
         // Reset form
         setGroupName('');
@@ -400,10 +477,26 @@ export default function GroupCreationPage() {
         // Reload groups list to show the new group
         loadGroups();
       } else {
-        toast.error(data.error || 'Failed to create group');
+        // Enhanced error handling with specific details
+        let errorMessage = data.error || 'Failed to create group';
+        
+        if (data.details) {
+          if (data.details.missing_contact_ids) {
+            errorMessage += `\n❌ Missing contacts: ${data.details.missing_contact_ids.length} contacts not found`;
+          }
+          if (data.details.invalid_contacts) {
+            errorMessage += `\n❌ Invalid contacts: ${data.details.invalid_contacts.length} contacts have invalid phone numbers`;
+          }
+          if (data.details.sync_attempted && !data.details.sync_performed) {
+            errorMessage += '\n🔄 Auto-sync was attempted but failed. Try syncing contacts manually.';
+          }
+        }
+        
+        toast.error(errorMessage);
       }
     } catch (error) {
-      toast.error('Failed to create group');
+      console.error('Group creation error:', error);
+      toast.error('Failed to create group. Please check your connection and try again.');
     } finally {
       setIsCreatingGroup(false);
     }
@@ -458,9 +551,30 @@ export default function GroupCreationPage() {
         {/* Contact Search & Selection */}
         <Card className="h-fit">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Search className="h-5 w-5" />
-              Search Contacts
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Search className="h-5 w-5" />
+                Search Contacts
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={syncContactsFromWasender}
+                disabled={isSyncingContacts}
+                className="text-xs"
+              >
+                {isSyncingContacts ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Sync Contacts
+                  </>
+                )}
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
