@@ -13,7 +13,8 @@ import {
   Loader2,
   BarChart3,
   User,
-  Bot
+  Bot,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,12 +45,12 @@ export function ConversationDetail({
   className 
 }: ConversationDetailProps) {
   const [message, setMessage] = useState('');
-  const [showDeliveryStats, setShowDeliveryStats] = useState(false);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
-  
-  // Refs for scroll management
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [showDeliveryStats, setShowDeliveryStats] = useState(false);
+  const [lastMessageCount, setLastMessageCount] = useState(0);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { contact } = conversation;
   
@@ -75,7 +76,7 @@ export function ConversationDetail({
   };
 
   const handleScroll = () => {
-    const container = messagesContainerRef.current;
+    const container = scrollContainerRef.current;
     if (!container) return;
 
     // Check if user is near the bottom (within 100px)
@@ -98,11 +99,24 @@ export function ConversationDetail({
   }, [conversationDetail?.data?.messages?.length, conversation.id]);
 
   useEffect(() => {
-    // Scroll to bottom when new messages arrive (only if user is at bottom)
-    if (!isUserScrolling && conversationDetail?.data?.messages && conversationDetail.data.messages.length > 0) {
-      scrollToBottom(true);
+    // Detect new messages and handle scrolling
+    if (conversationDetail?.data?.messages) {
+      const currentMessageCount = conversationDetail.data.messages.length;
+      
+      // Check if we have new messages
+      if (lastMessageCount > 0 && currentMessageCount > lastMessageCount) {
+        setHasNewMessages(true);
+        
+        // Auto-scroll to bottom if user is not scrolling and is near bottom
+        if (!isUserScrolling) {
+          scrollToBottom(true);
+          setHasNewMessages(false); // Clear indicator since we're scrolling to new messages
+        }
+      }
+      
+      setLastMessageCount(currentMessageCount);
     }
-  }, [conversationDetail?.data?.messages, isUserScrolling]);
+  }, [conversationDetail?.data?.messages, isUserScrolling, lastMessageCount]);
 
   const handleSendMessage = async () => {
     if (!message.trim() || sendMessageMutation.isPending) return;
@@ -207,6 +221,22 @@ export function ConversationDetail({
               <Button 
                 variant="ghost" 
                 size="icon" 
+                className={`relative h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6] ${hasNewMessages ? 'bg-green-100 text-green-600' : ''}`}
+                title={hasNewMessages ? "New messages available - Click to refresh" : "Refresh Messages"}
+                onClick={() => {
+                  refetch();
+                  setHasNewMessages(false);
+                }}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
+                {hasNewMessages && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                )}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
                 className="h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" 
                 title="Delivery Statistics"
                 onClick={() => setShowDeliveryStats(!showDeliveryStats)}
@@ -292,9 +322,9 @@ export function ConversationDetail({
 
         {/* Messages Area */}
         <div 
-          ref={messagesContainerRef}
+          ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex-1 p-4 overflow-y-auto bg-[#efeae2] scrollbar-thin" 
+          className="relative flex-1 p-4 overflow-y-auto bg-[#efeae2] scrollbar-thin" 
           style={{backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxwYXR0ZXJuIGlkPSJhIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgcGF0dGVyblRyYW5zZm9ybT0icm90YXRlKDEyKSI+CiAgICAgIDxwYXRoIGQ9Im0wIDBoMzAwdjMwMGgtMzAweiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMDIiLz4KICAgIDwvcGF0dGVybj4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNhKSIvPgo8L3N2Zz4=')"}}>
           <div className="max-w-4xl mx-auto space-y-2">
             {isLoading ? (
@@ -311,6 +341,8 @@ export function ConversationDetail({
               </div>
             ) : conversationDetail?.data?.messages && conversationDetail.data.messages.length > 0 ? (
               <>
+                {/* Debug: Log messages to console */}
+                {console.log('📨 Conversation messages:', conversationDetail.data.messages)}
                 {conversationDetail.data.messages.map((msg, index) => (
                   <MessageBubble 
                     key={msg.id || `${msg.timestamp}-${index}`} 
@@ -328,6 +360,22 @@ export function ConversationDetail({
                 ))}
                 {/* Invisible div for scroll targeting */}
                 <div ref={messagesEndRef} className="h-1" />
+                
+                {/* Scroll to bottom button when new messages arrive */}
+                {hasNewMessages && isUserScrolling && (
+                  <div className="absolute bottom-20 right-4 z-10">
+                    <Button
+                      size="sm"
+                      className="bg-green-500 hover:bg-green-600 text-white shadow-lg"
+                      onClick={() => {
+                        scrollToBottom(true);
+                        setHasNewMessages(false);
+                      }}
+                    >
+                      New messages ↓
+                    </Button>
+                  </div>
+                )}
               </>
             ) : (
               <div className="text-center py-8">

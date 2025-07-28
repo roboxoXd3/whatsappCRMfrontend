@@ -93,13 +93,17 @@ export interface Conversation {
   id: string;
   contact: Contact;
   last_message_at: string;
+  created_at: string;
   message_count: number;
   last_message_preview: string;
-  last_message_role: 'user' | 'assistant';
+  last_message_role: 'user' | 'assistant' | 'human';
   status: 'active' | 'closed' | 'pending';
   tags: string[];
   unread_count?: number; // For WhatsApp-style unread message badges
   bot_enabled?: boolean; // Whether bot auto-responses are enabled for this conversation
+  handover_requested?: boolean; // Whether user requested human support
+  handover_timestamp?: string; // When handover was requested
+  handover_reason?: string; // Trigger message for handover
 }
 
 export interface ConversationDetail {

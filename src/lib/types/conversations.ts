@@ -11,7 +11,7 @@ export interface Conversation {
   last_message_at: string;
   message_count: number;
   last_message_preview: string;
-  last_message_role: 'user' | 'assistant';
+  last_message_role: 'user' | 'assistant' | 'human';
   status: 'active' | 'closed' | 'pending';
   tags: string[];
 }

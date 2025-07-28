@@ -14,6 +14,7 @@ import {
   Key,
   Send,
   UsersRound,
+  UserCog,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -37,6 +38,13 @@ export const mainNavigation: NavigationItem[] = [
     href: '/conversations',
     icon: MessageSquare,
     description: 'Chat history and active conversations',
+  },
+  {
+    name: 'Handover',
+    href: '/handover',
+    icon: UserCog,
+    description: 'Bot-to-human handover management',
+    badge: 'New',
   },
   {
     name: 'CRM',
@@ -162,6 +170,7 @@ export const breadcrumbLabels: Record<string, string> = {
   settings: 'Settings',
   'api-keys': 'API Keys',
   notifications: 'Notifications',
+  handover: 'Handover Dashboard',
   new: 'New',
   edit: 'Edit',
 }; 
