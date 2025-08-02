@@ -15,6 +15,7 @@ function ConversationsContent() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [isNewConversationModalOpen, setIsNewConversationModalOpen] = useState(false);
   const [showContactInfo, setShowContactInfo] = useState(true);
+  const [showLeadAnalysis, setShowLeadAnalysis] = useState(false);
   
   // Fetch conversations to enable auto-selection
   const { data: conversationsData } = useConversations();
@@ -50,7 +51,25 @@ function ConversationsContent() {
   };
 
   const toggleContactInfo = () => {
-    setShowContactInfo(!showContactInfo);
+    if (showLeadAnalysis) {
+      // If lead analysis is open, close it and open contact info
+      setShowLeadAnalysis(false);
+      setShowContactInfo(true);
+    } else {
+      // Otherwise just toggle contact info
+      setShowContactInfo(!showContactInfo);
+    }
+  };
+
+  const toggleLeadAnalysis = () => {
+    if (showContactInfo) {
+      // If contact info is open, close it and open lead analysis
+      setShowContactInfo(false);
+      setShowLeadAnalysis(true);
+    } else {
+      // Otherwise just toggle lead analysis
+      setShowLeadAnalysis(!showLeadAnalysis);
+    }
   };
 
   return (
@@ -82,6 +101,8 @@ function ConversationsContent() {
             onBack={() => setSelectedConversation(null)}
             onToggleContactInfo={toggleContactInfo}
             showContactInfo={showContactInfo}
+            onToggleLeadAnalysis={toggleLeadAnalysis}
+            showLeadAnalysis={showLeadAnalysis}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-[#f0f2f5]">

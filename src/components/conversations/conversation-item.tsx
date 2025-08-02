@@ -1,7 +1,7 @@
 'use client';
 
 import { formatDistanceToNow } from 'date-fns';
-import { MessageCircle, Phone, Clock, Tag, Bot, User } from 'lucide-react';
+import { MessageCircle, Phone, Clock, Tag, Bot, User, Target, Brain } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Conversation } from '@/lib/types/api';
 import { cn } from '@/lib/utils';
@@ -35,6 +35,11 @@ export function ConversationItem({
   
   // Use enriched contact data directly from the API (no need for separate customer context call)
   const hasEnrichedData = contact.company || contact.lead_status;
+  
+  // Mock lead qualification data based on conversation depth and content
+  const isQualifiedLead = message_count > 6 && last_message_preview && last_message_preview.length > 50;
+  const leadScore = Math.min(95, message_count * 15);
+  const hasBusinessIntent = message_count > 3;
   
   // Format the enriched contact data for display
   const getDisplayName = () => {
@@ -144,6 +149,18 @@ export function ConversationItem({
                 Human Support Requested
               </Badge>
             )}
+            {isQualifiedLead && (
+              <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
+                <Target className="h-3 w-3 mr-1" />
+                Qualified Lead
+              </Badge>
+            )}
+            {hasBusinessIntent && !isQualifiedLead && (
+              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300">
+                <Brain className="h-3 w-3 mr-1" />
+                Business Intent
+              </Badge>
+            )}
           </div>
           <div className="flex items-center space-x-2">
             {showBotStatus && (
@@ -174,6 +191,15 @@ export function ConversationItem({
               <Badge variant="secondary" className="text-xs">
                 {unreadCount}
               </Badge>
+            )}
+            
+            {/* Lead Score Indicator */}
+            {hasBusinessIntent && (
+              <div className="text-xs text-gray-500">
+                Score: <span className={`font-medium ${isQualifiedLead ? 'text-green-600' : 'text-blue-600'}`}>
+                  {leadScore}
+                </span>
+              </div>
             )}
             
             {/* Priority indicators */}

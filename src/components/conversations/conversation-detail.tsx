@@ -14,7 +14,8 @@ import {
   BarChart3,
   User,
   Bot,
-  RefreshCw
+  RefreshCw,
+  Brain
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,12 +29,16 @@ import { useSendMessage } from '@/hooks/useConversations';
 import { Conversation } from '@/lib/types/api';
 import { cn } from '@/lib/utils';
 import { ContactInfoPanel } from './contact-info-panel';
+import LeadQualificationPanel from './lead-qualification-panel';
+import FloatingLeadAnalysis from './floating-lead-analysis';
 
 interface ConversationDetailProps {
   conversation: Conversation;
   onBack?: () => void;
   onToggleContactInfo?: () => void;
   showContactInfo?: boolean;
+  onToggleLeadAnalysis?: () => void;
+  showLeadAnalysis?: boolean;
   className?: string;
 }
 
@@ -42,6 +47,8 @@ export function ConversationDetail({
   onBack,
   onToggleContactInfo,
   showContactInfo,
+  onToggleLeadAnalysis,
+  showLeadAnalysis,
   className 
 }: ConversationDetailProps) {
   const [message, setMessage] = useState('');
@@ -161,6 +168,21 @@ export function ConversationDetail({
 
   return (
     <div className={cn("flex h-full bg-white", className)}>
+      {/* Floating Lead Analysis - Fixed positioning for better UX */}
+      {showLeadAnalysis && (
+        <FloatingLeadAnalysis
+          conversation={conversation}
+          onClose={() => {
+            console.log('Floating lead analysis closed');
+            onToggleLeadAnalysis?.();
+          }}
+          onScheduleCall={() => {
+            console.log('Sending Calendly link to qualified lead');
+            alert('Calendly link would be sent to qualified lead!');
+          }}
+        />
+      )}
+
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Chat Header */}
@@ -218,6 +240,19 @@ export function ConversationDetail({
                 conversationId={conversation.id}
                 variant="compact"
               />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={`h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6] transition-all duration-200 ${
+                  showLeadAnalysis 
+                    ? 'bg-purple-100 text-purple-600 border-2 border-purple-300 shadow-md' 
+                    : 'hover:bg-purple-50'
+                }`}
+                title="AI Lead Analysis"
+                onClick={onToggleLeadAnalysis}
+              >
+                <Brain className={`h-5 w-5 ${showLeadAnalysis ? 'animate-pulse' : ''}`} />
+              </Button>
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -453,8 +488,8 @@ export function ConversationDetail({
         </div>
       </div>
 
-      {/* Customer Info Sidebar */}
-      {showContactInfo && (
+      {/* Contact Info Sidebar - Only show if Lead Analysis is not active */}
+      {showContactInfo && !showLeadAnalysis && (
         <>
           <div className="w-px bg-gray-200"></div>
           <ContactInfoPanel 

@@ -30,6 +30,7 @@ import { useDashboardStats, useHealthCheck } from '@/lib/hooks/use-dashboard-dat
 import { useConversations, type Conversation } from '@/lib/hooks/use-conversations';
 import { useCampaigns, type Campaign } from '@/lib/hooks/use-campaigns';
 import { useTasks } from '@/hooks/useCRM';
+import LeadQualificationWidget from '@/components/dashboard/lead-qualification-widget';
 
 export default function DashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('Week');
@@ -576,6 +577,12 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Lead Qualification Analytics */}
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">AI Lead Qualification Analytics</h2>
+          <LeadQualificationWidget />
         </div>
       </div>
     </div>
