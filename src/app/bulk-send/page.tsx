@@ -1,14 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Send, Users, MessageSquare, CheckCircle, AlertCircle, Clock, Upload, FileText } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Send, CheckCircle, Clock } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { BulkSendForm } from '@/components/bulk-send/bulk-send-form';
 import { BulkSendHistory } from '@/components/bulk-send/bulk-send-history';
 import { BulkSendStats } from '@/components/bulk-send/bulk-send-stats';

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { setAuthCookies, getAuthFromCookies, clearAuthCookies } from '@/lib/utils/cookies';
 
 interface User {
   id: string;
@@ -15,10 +16,13 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isHydrated: boolean;
   login: (user: User, token: string) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
   updateUser: (user: Partial<User>) => void;
+  initializeAuth: () => void;
+  checkAuthFromCookies: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -28,6 +32,7 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoading: false,
+      isHydrated: false,
 
       login: (user: User, token: string) => {
         set({
@@ -37,9 +42,10 @@ export const useAuthStore = create<AuthState>()(
           isLoading: false,
         });
 
-        // Store token in localStorage for API client
+        // Store in both localStorage and cookies for maximum persistence
         if (typeof window !== 'undefined') {
           localStorage.setItem('auth_token', token);
+          setAuthCookies(user, token);
         }
       },
 
@@ -51,9 +57,64 @@ export const useAuthStore = create<AuthState>()(
           isLoading: false,
         });
 
-        // Remove token from localStorage
+        // Clear from both localStorage and cookies
         if (typeof window !== 'undefined') {
           localStorage.removeItem('auth_token');
+          clearAuthCookies();
+        }
+      },
+
+      checkAuthFromCookies: () => {
+        if (typeof window === 'undefined') return;
+
+        const authData = getAuthFromCookies();
+        if (authData) {
+          set({
+            user: authData.user,
+            token: authData.token,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+
+          // Sync with localStorage
+          localStorage.setItem('auth_token', authData.token);
+        }
+      },
+
+      initializeAuth: () => {
+        if (typeof window === 'undefined') return;
+
+        set({ isLoading: true });
+
+        // First try to get from Zustand persistence (localStorage)
+        const currentState = get();
+        if (currentState.token && currentState.user) {
+          set({
+            isAuthenticated: true,
+            isLoading: false,
+            isHydrated: true,
+          });
+          return;
+        }
+
+        // If not in Zustand, try cookies
+        const authData = getAuthFromCookies();
+        if (authData) {
+          set({
+            user: authData.user,
+            token: authData.token,
+            isAuthenticated: true,
+            isLoading: false,
+            isHydrated: true,
+          });
+
+          // Sync with localStorage
+          localStorage.setItem('auth_token', authData.token);
+        } else {
+          set({
+            isLoading: false,
+            isHydrated: true,
+          });
         }
       },
 
@@ -77,6 +138,12 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        // After rehydration, check cookies as fallback and mark as hydrated
+        if (state) {
+          state.initializeAuth();
+        }
+      },
     }
   )
 ); 

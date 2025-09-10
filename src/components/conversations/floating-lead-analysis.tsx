@@ -34,7 +34,7 @@ export default function FloatingLeadAnalysis({
   const [loading, setLoading] = useState(false);
 
   // Extract phone number from conversation
-  const phoneNumber = conversation?.phone_number || conversation?.contact?.phone_number || conversation?.id;
+  const phoneNumber = conversation?.contact?.phone_number || conversation?.phone_number;
 
   // Fetch real lead analysis data
   useEffect(() => {
@@ -224,8 +224,8 @@ export default function FloatingLeadAnalysis({
               onClick={(e) => {
                 e.stopPropagation();
                 console.log('View full analysis clicked');
-                const phoneNumber = encodeURIComponent(conversation?.phone_number || conversation?.id || '1234567890');
-                router.push(`/lead-analysis/${phoneNumber}`);
+                const analysisPhoneNumber = encodeURIComponent(conversation?.contact?.phone_number || conversation?.phone_number || 'unknown');
+                router.push(`/lead-analysis/${analysisPhoneNumber}`);
               }}
             >
               <Zap className="h-4 w-4 mr-2" />

@@ -9,7 +9,7 @@ class ApiClient {
     
     this.instance = axios.create({
       baseURL,
-      timeout: 15000, // Increased timeout for production
+      timeout: 30000, // Increased timeout for WhatsApp API operations
       headers: {
         'Content-Type': 'application/json',
       },
@@ -82,8 +82,22 @@ class ApiClient {
   private handleUnauthorized() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('auth_token');
-      // You can add redirect logic here
-      // window.location.href = '/auth/login';
+      
+      // Clear auth store if available
+      try {
+        // Use dynamic import without await in interceptor
+        import('@/lib/stores/auth').then((authModule) => {
+          const authStore = authModule.useAuthStore.getState();
+          authStore.logout();
+        }).catch((error) => {
+          console.warn('Could not access auth store:', error);
+        });
+      } catch (error) {
+        console.warn('Could not access auth store:', error);
+      }
+      
+      // Redirect to login page
+      window.location.href = '/auth/login';
     }
   }
 

@@ -21,10 +21,15 @@ export interface LeadAnalysisData {
   };
   conversationAnalysis: {
     totalMessages: number;
+    userMessages: number;
+    botMessages: number;
     avgResponseTime: number;
     engagementLevel: number;
     topics: string[];
     sentiment: 'positive' | 'neutral' | 'negative';
+    sentimentScore?: number;
+    journeyStage: string;
+    sessionDuration?: number;
   };
   identifiedNeeds: {
     primary: string[];
@@ -34,8 +39,9 @@ export interface LeadAnalysisData {
   timeline: Array<{
     date: string;
     event: string;
-    type: 'message' | 'qualification' | 'action';
+    type: 'message' | 'qualification' | 'action' | 'journey_update' | 'ai_analysis';
     score?: number;
+    details?: string;
   }>;
   recommendations: {
     immediate: string[];
@@ -47,6 +53,46 @@ export interface LeadAnalysisData {
     bestContactTime: string;
     recommendedApproach: string;
     estimatedValue: number;
+  };
+  // Enhanced analytics from backend
+  aiPerformance?: {
+    ragQueriesUsed: number;
+    enhancedResponsesCount: number;
+    personalizationLevel: string;
+    avgProcessingTime: number;
+    totalTokensUsed: number;
+    costEstimate: number;
+  };
+  messageAnalytics?: Array<{
+    messageId: string;
+    role: 'user' | 'assistant';
+    length: number;
+    aiHandlerUsed: string;
+    processingTimeMs: number;
+    ragDocumentsRetrieved: number;
+    detectedIntents: string[];
+    businessCategory: string;
+    urgencyLevel: string;
+    sentimentScore: number;
+    timestamp: string;
+  }>;
+  leadQualificationLogs?: Array<{
+    timestamp: string;
+    leadScore: number;
+    confidence: number;
+    reason: string;
+    businessIndicators: string[];
+    buyingSignals: string[];
+    recommendedAction: string;
+    messageAnalyzed: string;
+  }>;
+  conversationMetrics?: {
+    sessionsCount: number;
+    businessIntentDetected: boolean;
+    pricingDiscussed: boolean;
+    demoRequested: boolean;
+    leadScore: number;
+    engagementScore: number;
   };
 }
 

@@ -1,18 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, Plus, MessageCircle, Users } from 'lucide-react';
+import { useState, useCallback, useMemo } from 'react';
+import { Search, Plus, MessageCircle, X, Filter, SortAsc } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useConversations, useConversationSearch, useCRMContactSearch } from '@/hooks/useConversations';
+import { useConversations, useConversationSearch } from '@/hooks/useConversations';
 import { Conversation } from '@/lib/types/api';
 import { ConversationFilters } from '@/lib/types/conversations';
 import { cn } from '@/lib/utils';
-import CRMContactList from './crm-contact-list';
-import { CRMContact } from '@/lib/api/conversations';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface ConversationListProps {
   selectedConversationId?: string;
@@ -20,16 +18,24 @@ interface ConversationListProps {
   onNewConversation?: () => void;
 }
 
+type SortOption = 'recent' | 'name' | 'unread';
+type FilterOption = 'all' | 'unread' | 'active' | 'bot' | 'human';
+
 export function ConversationList({ 
   selectedConversationId, 
   onConversationSelect,
   onNewConversation 
 }: ConversationListProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('conversations');
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const [filterBy, setFilterBy] = useState<FilterOption>('all');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Debounce search query to avoid too many API calls
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const filters: ConversationFilters = {
-    limit: 50,
+    limit: 100, // Increased limit for better scrolling experience
     offset: 0,
   };
 
@@ -45,28 +51,21 @@ export function ConversationList({
     isLoading: isLoadingSearch,
     error: searchError,
   } = useConversationSearch({
-    q: searchQuery,
-    limit: 50,
+    q: debouncedSearchQuery,
+    limit: 100,
     offset: 0,
   });
 
-  // CRM Contact search
-  const {
-    data: crmSearchData,
-    isLoading: isLoadingCRMSearch,
-    error: crmSearchError,
-  } = useCRMContactSearch(searchQuery, 50);
-
   // Determine which data to use for conversations
-  const isSearchMode = searchQuery.length > 2;
+  const isSearchMode = debouncedSearchQuery.length > 2;
   const data = isSearchMode ? searchData : conversationsData;
   const isLoading = isSearchMode ? isLoadingSearch : isLoadingConversations;
   const error = isSearchMode ? searchError : conversationsError;
 
-  const conversations = data?.data || [];
-  const crmContacts = crmSearchData?.data || [];
+  const rawConversations = useMemo(() => data?.data || [], [data?.data]);
 
-  const formatTime = (dateString: string) => {
+  // Helper functions
+  const formatTime = useCallback((dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
@@ -77,9 +76,9 @@ export function ConversationList({
     if (diffInMinutes < 10080) return `${Math.floor(diffInMinutes / 1440)}d ago`;
     
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
+  }, []);
 
-  const getInitials = (name: string) => {
+  const getInitials = useCallback((name: string) => {
     if (!name) return '?';
     return name
       .split(' ')
@@ -87,17 +86,17 @@ export function ConversationList({
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
+  }, []);
 
-  const formatPhoneNumber = (phone: string) => {
+  const formatPhoneNumber = useCallback((phone: string) => {
     const cleanPhone = phone.replace('_s_whatsapp_net', '');
     if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
       return `+91 ${cleanPhone.slice(2, 7)} ${cleanPhone.slice(7)}`;
     }
     return cleanPhone.startsWith('+') ? cleanPhone : `+${cleanPhone}`;
-  };
+  }, []);
 
-  const getContactDisplayName = (contact: any) => {
+  const getContactDisplayName = useCallback((contact: Conversation['contact']) => {
     // Priority: verified_name > name > company > formatted phone
     if (contact.verified_name) {
       return contact.verified_name;
@@ -109,19 +108,165 @@ export function ConversationList({
       return `Contact from ${contact.company}`;
     }
     return contact.display_phone || formatPhoneNumber(contact.phone_number);
-  };
+  }, [formatPhoneNumber]);
 
-  const handleConversationClick = (conversation: Conversation) => {
+  // Enhanced filtering and sorting
+  const filteredAndSortedConversations = useMemo(() => {
+    let filtered = [...rawConversations];
+
+    // Apply filters
+    switch (filterBy) {
+      case 'unread':
+        filtered = filtered.filter(conv => conv.unread_count && conv.unread_count > 0);
+        break;
+      case 'active':
+        filtered = filtered.filter(conv => conv.status === 'active');
+        break;
+      case 'bot':
+        filtered = filtered.filter(conv => conv.last_message_role === 'assistant');
+        break;
+      case 'human':
+        filtered = filtered.filter(conv => conv.last_message_role === 'human');
+        break;
+      default:
+        // 'all' - no filtering
+        break;
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'recent':
+        filtered.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+        break;
+      case 'name':
+        filtered.sort((a, b) => {
+          const nameA = getContactDisplayName(a.contact).toLowerCase();
+          const nameB = getContactDisplayName(b.contact).toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+        break;
+      case 'unread':
+        filtered.sort((a, b) => (b.unread_count || 0) - (a.unread_count || 0));
+        break;
+    }
+
+    return filtered;
+  }, [rawConversations, filterBy, sortBy, getContactDisplayName]);
+
+  const conversations = filteredAndSortedConversations;
+
+  const handleConversationClick = useCallback((conversation: Conversation) => {
     onConversationSelect?.(conversation);
-  };
+  }, [onConversationSelect]);
 
-  const handleCRMContactStartConversation = (contact: CRMContact) => {
-    // Switch to conversations tab after starting a conversation
-    setActiveTab('conversations');
-    setSearchQuery(''); // Clear search to show all conversations
-  };
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+  }, []);
 
-  const renderConversationsList = () => {
+  const getFilteredCount = useCallback((filter: FilterOption) => {
+    switch (filter) {
+      case 'unread':
+        return rawConversations.filter(conv => conv.unread_count && conv.unread_count > 0).length;
+      case 'active':
+        return rawConversations.filter(conv => conv.status === 'active').length;
+      case 'bot':
+        return rawConversations.filter(conv => conv.last_message_role === 'assistant').length;
+      case 'human':
+        return rawConversations.filter(conv => conv.last_message_role === 'human').length;
+      default:
+        return rawConversations.length;
+    }
+  }, [rawConversations]);
+
+  const renderConversationItem = useCallback((conversation: Conversation, index: number) => {
+    const isSelected = selectedConversationId === conversation.id;
+    const displayName = getContactDisplayName(conversation.contact);
+    
+    return (
+      <div
+        key={conversation.id}
+        onClick={() => handleConversationClick(conversation)}
+        className={cn(
+          "flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-all duration-200",
+          "border-l-4 border-transparent hover:border-blue-300",
+          isSelected && "bg-blue-50 border-l-blue-500 shadow-sm"
+        )}
+        style={{
+          transform: `translateY(${index * 0.5}px)`,
+          animationDelay: `${index * 50}ms`
+        }}
+      >
+        {/* Avatar */}
+        <div className="relative">
+          <Avatar className="w-12 h-12 ring-2 ring-white shadow-sm">
+            {conversation.contact.profile_image_url ? (
+              <img 
+                src={conversation.contact.profile_image_url} 
+                alt={displayName}
+                className="w-full h-full object-cover rounded-full"
+              />
+            ) : (
+              <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
+                {getInitials(displayName)}
+              </AvatarFallback>
+            )}
+          </Avatar>
+          
+          {/* Status indicators */}
+          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+          
+          {/* Message type indicator */}
+          {conversation.last_message_role === 'assistant' && (
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-xs">🤖</span>
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="font-medium text-gray-900 truncate">
+              {displayName}
+            </h4>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 flex-shrink-0">
+                {formatTime(conversation.last_message_at)}
+              </span>
+              {conversation.unread_count && conversation.unread_count > 0 && (
+                <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center animate-pulse">
+                  {conversation.unread_count}
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              {conversation.last_message_role === 'assistant' && (
+                <span className="text-blue-500 text-xs">✓</span>
+              )}
+              <p className="text-sm text-gray-600 truncate">
+                {conversation.last_message_preview || 'No messages yet'}
+              </p>
+            </div>
+            
+            {/* Conversation status badges */}
+            <div className="flex gap-1 ml-2">
+              {conversation.bot_enabled === false && (
+                <div className="w-2 h-2 bg-orange-400 rounded-full" title="Bot disabled" />
+              )}
+              {conversation.handover_requested && (
+                <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" title="Human support requested" />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }, [selectedConversationId, getContactDisplayName, handleConversationClick, formatTime, getInitials]);
+
+  const renderConversationsList = useCallback(() => {
     if (error) {
       return (
         <div className="p-6 text-center">
@@ -139,18 +284,17 @@ export function ConversationList({
 
     if (isLoading) {
       return (
-        <div className="p-6 text-center">
-          <div className="animate-pulse space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 p-3">
-                <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
-                <div className="flex-1">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </div>
+        <div className="space-y-1">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
+              <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+              <div className="flex-1">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
               </div>
-            ))}
-          </div>
+              <div className="w-8 h-3 bg-gray-200 rounded"></div>
+            </div>
+          ))}
         </div>
       );
     }
@@ -158,13 +302,18 @@ export function ConversationList({
     if (conversations.length === 0) {
       return (
         <div className="p-6 text-center">
-          <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No conversations</h3>
+          <MessageCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            {isSearchMode ? 'No matching conversations' : 'No conversations yet'}
+          </h3>
           <p className="text-gray-600 mb-4">
-            {isSearchMode ? 'No conversations match your search.' : 'Start a new conversation to get started.'}
+            {isSearchMode 
+              ? 'Try adjusting your search or filters.' 
+              : 'Start a new conversation to get started.'
+            }
           </p>
           {!isSearchMode && (
-            <Button onClick={onNewConversation}>
+            <Button onClick={onNewConversation} className="bg-green-600 hover:bg-green-700">
               <Plus className="h-4 w-4 mr-2" />
               New Conversation
             </Button>
@@ -175,147 +324,148 @@ export function ConversationList({
 
     return (
       <div className="divide-y divide-gray-100">
-        {conversations.map((conversation) => {
-          const isSelected = selectedConversationId === conversation.id;
-          const displayName = getContactDisplayName(conversation.contact);
-          
-          return (
-            <div
-              key={conversation.id}
-              onClick={() => handleConversationClick(conversation)}
-              className={cn(
-                "flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors",
-                isSelected && "bg-blue-50 border-r-2 border-blue-500"
-              )}
-            >
-              {/* Avatar */}
-              <div className="relative">
-                <Avatar className="w-12 h-12">
-                  {conversation.contact.profile_image_url ? (
-                    <img 
-                      src={conversation.contact.profile_image_url} 
-                      alt={displayName}
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  ) : (
-                    <AvatarFallback className="bg-gray-200 text-gray-700 font-medium">
-                      {getInitials(displayName)}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                {/* Online status indicator */}
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="font-medium text-gray-900 truncate">
-                    {displayName}
-                  </h4>
-                  <span className="text-xs text-gray-500 flex-shrink-0">
-                    {formatTime(conversation.last_message_at)}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-600 truncate">
-                    {conversation.last_message_role === 'assistant' && '✓ '}
-                    {conversation.last_message_preview || 'No messages yet'}
-                  </p>
-                  
-                  {/* Unread count */}
-                  {conversation.unread_count && conversation.unread_count > 0 && (
-                    <Badge className="bg-green-500 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center">
-                      {conversation.unread_count}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {conversations.map((conversation, index) => renderConversationItem(conversation, index))}
       </div>
     );
-  };
+  }, [error, isLoading, conversations, isSearchMode, onNewConversation, renderConversationItem]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Search Bar */}
-      <div className="p-3 border-b border-gray-200">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder={activeTab === 'conversations' ? "Search conversations..." : "Search CRM contacts..."}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-gray-100 border-0 rounded-lg"
-          />
-        </div>
-      </div>
+    <div className="flex flex-col h-full bg-white">
+      {/* Enhanced Search Bar */}
+      <div className="p-3 border-b border-gray-200 bg-white">
+        <div className="space-y-3">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search conversations by name, phone, or message..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-10 bg-gray-50 border-gray-200 rounded-lg focus:bg-white transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-2 mx-3 mt-2">
-          <TabsTrigger value="conversations" className="flex items-center gap-2">
-            <MessageCircle className="h-4 w-4" />
-            Conversations
-          </TabsTrigger>
-          <TabsTrigger value="crm" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            CRM Contacts
-          </TabsTrigger>
-        </TabsList>
+          {/* Filters and Sort */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filter
+                {filterBy !== 'all' && (
+                  <Badge variant="secondary" className="ml-2 h-5 text-xs">
+                    {getFilteredCount(filterBy)}
+                  </Badge>
+                )}
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSortBy(sortBy === 'recent' ? 'name' : sortBy === 'name' ? 'unread' : 'recent')}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <SortAsc className="h-4 w-4 mr-2" />
+                {sortBy === 'recent' ? 'Recent' : sortBy === 'name' ? 'Name' : 'Unread'}
+              </Button>
+            </div>
 
-        <TabsContent value="conversations" className="flex-1 flex flex-col mt-0">
-          {/* Section Header */}
-          <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                Recent
-              </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">
+                {conversations.length} of {rawConversations.length}
+              </span>
               <Button variant="ghost" size="sm" onClick={onNewConversation}>
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Conversations List */}
-          <div className="flex-1 overflow-y-auto">
-            {renderConversationsList()}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="crm" className="flex-1 flex flex-col mt-0">
-          {/* Section Header */}
-          <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                CRM Contacts
-              </h3>
-              <span className="text-xs text-gray-500">
-                {searchQuery.length > 2 ? `${crmContacts.length} found` : 'Type to search'}
-              </span>
+          {/* Filter Pills */}
+          {showFilters && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+              {(['all', 'unread', 'active', 'bot', 'human'] as FilterOption[]).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setFilterBy(filter)}
+                  className={cn(
+                    "px-3 py-1 rounded-full text-xs font-medium transition-colors",
+                    filterBy === filter
+                      ? "bg-blue-100 text-blue-700 border border-blue-200"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  )}
+                >
+                  {filter === 'all' ? 'All' : 
+                   filter === 'unread' ? 'Unread' :
+                   filter === 'active' ? 'Active' :
+                   filter === 'bot' ? 'Bot' : 'Human'}
+                  {filter !== 'all' && (
+                    <span className="ml-1 opacity-70">
+                      ({getFilteredCount(filter)})
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
-          </div>
+          )}
+        </div>
+      </div>
 
-          {/* CRM Contacts List */}
-          <div className="flex-1 overflow-y-auto p-3">
-            {searchQuery.length > 2 ? (
-              <CRMContactList
-                contacts={crmContacts}
-                isLoading={isLoadingCRMSearch}
-                onStartConversation={handleCRMContactStartConversation}
-              />
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <p>Type at least 3 characters to search CRM contacts</p>
-              </div>
+      {/* Search Results Summary */}
+      {(isSearchMode || filterBy !== 'all') && (
+        <div className="px-4 py-2 bg-blue-50 border-b border-blue-100">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-blue-700">
+              {isSearchMode && filterBy !== 'all' 
+                ? `Found ${conversations.length} conversations matching "${debouncedSearchQuery}" with filter "${filterBy}"`
+                : isSearchMode 
+                  ? `Found ${conversations.length} conversations matching "${debouncedSearchQuery}"`
+                  : `Showing ${conversations.length} ${filterBy} conversations`
+              }
+            </span>
+            {(isSearchMode || filterBy !== 'all') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilterBy('all');
+                }}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                Clear
+              </Button>
             )}
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
+
+      {/* Conversations List */}
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+        {renderConversationsList()}
+      </div>
+
+      {/* Footer Stats */}
+      <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>Total: {rawConversations.length} conversations</span>
+          <div className="flex items-center gap-4">
+            <span>Unread: {getFilteredCount('unread')}</span>
+            <span>Active: {getFilteredCount('active')}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 } 

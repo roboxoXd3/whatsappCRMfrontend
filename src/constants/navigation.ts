@@ -15,6 +15,8 @@ import {
   Send,
   UsersRound,
   UserCog,
+  Smartphone,
+  BookOpen,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -45,6 +47,13 @@ export const mainNavigation: NavigationItem[] = [
     icon: UserCog,
     description: 'Bot-to-human handover management',
     badge: 'New',
+  },
+  {
+    name: 'Knowledge Base',
+    href: '/knowledge-base',
+    icon: BookOpen,
+    description: 'Manage AI assistant knowledge and training data',
+    badge: 'AI',
   },
   {
     name: 'CRM',
@@ -112,6 +121,13 @@ export const secondaryNavigation: NavigationItem[] = [
     description: 'System alerts and updates',
   },
   {
+    name: 'WhatsApp Connect',
+    href: '/whatsapp-connect',
+    icon: Smartphone,
+    description: 'Connect your WhatsApp account',
+    badge: 'New',
+  },
+  {
     name: 'Settings',
     href: '/settings',
     icon: Settings,
@@ -171,6 +187,8 @@ export const breadcrumbLabels: Record<string, string> = {
   'api-keys': 'API Keys',
   notifications: 'Notifications',
   handover: 'Handover Dashboard',
+  'whatsapp-connect': 'WhatsApp Connect',
+  'knowledge-base': 'Knowledge Base',
   new: 'New',
   edit: 'Edit',
 }; 

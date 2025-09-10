@@ -1,7 +1,7 @@
 'use client';
 
 import { formatDistanceToNow } from 'date-fns';
-import { MessageCircle, Phone, Clock, Tag, Bot, User, Target, Brain } from 'lucide-react';
+import { Target, Brain } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Conversation } from '@/lib/types/api';
 import { cn } from '@/lib/utils';

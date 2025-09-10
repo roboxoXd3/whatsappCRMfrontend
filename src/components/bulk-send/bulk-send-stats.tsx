@@ -1,13 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { TrendingUp, Users, MessageSquare, Clock, CheckCircle, AlertCircle, Calendar, BarChart3 } from 'lucide-react';
+import { TrendingUp, Users, MessageSquare, Clock, CheckCircle, BarChart3, Calendar } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function BulkSendStats() {
-  const [selectedPeriod, setSelectedPeriod] = useState('7d');
+  // const [selectedPeriod, setSelectedPeriod] = useState('7d');
 
   const stats = {
     overview: {

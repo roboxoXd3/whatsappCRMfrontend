@@ -64,7 +64,7 @@ export default function LoginPage() {
         login(user, data.token);
         router.push('/dashboard');
       } else {
-        setErrors({ general: data.error || 'Login failed. Please try again.' });
+        setErrors({ general: data.message || 'Login failed. Please try again.' });
       }
       
     } catch (error) {

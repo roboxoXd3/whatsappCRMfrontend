@@ -11,16 +11,16 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
-  const { isAuthenticated, isLoading, token } = useAuthStore();
+  const { isAuthenticated, isLoading, token, isHydrated } = useAuthStore();
 
   // For SaaS mode, we need proper authentication
   const requiresAuth = true; // Changed from development bypass
 
   useEffect(() => {
-    if (requiresAuth && !isLoading && !isAuthenticated) {
+    if (requiresAuth && isHydrated && !isLoading && !isAuthenticated) {
       router.push('/auth/login');
     }
-  }, [isAuthenticated, isLoading, router, requiresAuth]);
+  }, [isAuthenticated, isLoading, isHydrated, router, requiresAuth]);
 
   // Verify token on mount if we have one
   useEffect(() => {
@@ -51,8 +51,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     verifyToken();
   }, [token, isAuthenticated, router]);
 
-  // Show loading screen while checking authentication
-  if (requiresAuth && isLoading) {
+  // Show loading screen while checking authentication or hydrating
+  if (requiresAuth && (isLoading || !isHydrated)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -71,8 +71,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  // If not authenticated, don't render children (redirect will happen)
-  if (requiresAuth && !isAuthenticated) {
+  // If not authenticated and hydrated, don't render children (redirect will happen)
+  if (requiresAuth && isHydrated && !isAuthenticated) {
     return null;
   }
 
