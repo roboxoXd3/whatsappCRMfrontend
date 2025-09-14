@@ -12,11 +12,20 @@ import { apiClient } from './client';
 export interface WhatsAppSession {
   session_id: string;
   session_name: string;
-  status: 'pending' | 'connected' | 'expired' | 'failed';
+  status: 'pending' | 'connected' | 'expired' | 'failed' | 'logged_out';
   created_at: string;
   connected_at?: string;
   phone_number?: string;
   expires_at?: string;
+  webhook_url?: string;
+  metadata?: {
+    webhook_config?: {
+      webhook_url: string;
+      webhook_events: string[];
+      webhook_enabled: boolean;
+      configured_at: string;
+    };
+  };
 }
 
 export interface QRCodeData {
@@ -26,16 +35,51 @@ export interface QRCodeData {
   qr_url?: string;
   expires_at: string;
   webhook_url: string;
+  webhook_events?: string[];
   status: string;
 }
 
 export interface SessionStatus {
   session_id: string;
-  status: 'pending' | 'connected' | 'expired' | 'failed';
+  status: 'pending' | 'connected' | 'expired' | 'failed' | 'logged_out';
   connected_at?: string;
   phone_number?: string;
   last_activity: string;
   expires_at?: string;
+}
+
+export interface LiveSessionStatus {
+  session_id: string;
+  live_status: string;
+  database_status: string;
+  last_checked: string;
+  phone_number?: string;
+  user_info?: {
+    id: string;
+    name: string;
+    lid?: string;
+  };
+  connected_at?: string;
+  created_at?: string;
+}
+
+export interface HealthCheckResult {
+  total_sessions: number;
+  connected: number;
+  pending: number;
+  expired: number;
+  failed: number;
+  sessions: SessionHealthInfo[];
+}
+
+export interface SessionHealthInfo {
+  session_id: string;
+  session_name: string;
+  database_status: string;
+  live_status?: string;
+  phone_number?: string;
+  last_checked: string;
+  health_status: 'healthy' | 'needs_attention' | 'unhealthy' | 'api_error' | 'network_error' | 'unknown';
 }
 
 export interface CreateSessionResponse {
@@ -144,6 +188,95 @@ export class WhatsAppSessionAPI {
   }
 
   /**
+   * Check live session status by calling WasenderAPI directly
+   */
+  static async checkLiveStatus(sessionId: string): Promise<LiveSessionStatus> {
+    const response = await apiClient.get<LiveSessionStatus>(`/api/whatsapp/session/status-check/${sessionId}`);
+    
+    if (response.status !== 'success' || !response.data) {
+      throw new Error(response.message || 'Failed to check live session status');
+    }
+    
+    return response.data;
+  }
+
+  /**
+   * Disconnect a WhatsApp session
+   */
+  static async disconnectSession(sessionId: string): Promise<{ session_id: string; message: string }> {
+    const response = await apiClient.post<{ session_id: string; message: string }>(`/api/whatsapp/session/disconnect/${sessionId}`);
+    
+    if (response.status !== 'success' || !response.data) {
+      throw new Error(response.message || 'Failed to disconnect session');
+    }
+    
+    return response.data;
+  }
+
+  /**
+   * Perform health check on all user sessions
+   */
+  static async healthCheck(): Promise<HealthCheckResult> {
+    const response = await apiClient.get<HealthCheckResult>('/api/whatsapp/session/health-check');
+    
+    if (response.status !== 'success' || !response.data) {
+      throw new Error(response.message || 'Failed to perform health check');
+    }
+    
+    return response.data;
+  }
+
+  /**
+   * Reconnect a disconnected/expired WhatsApp session
+   */
+  static async reconnectSession(sessionId: string): Promise<QRCodeData> {
+    const response = await apiClient.post<QRCodeData>(`/api/whatsapp/session/reconnect/${sessionId}`);
+    
+    if (response.status !== 'success' || !response.data) {
+      throw new Error(response.message || 'Failed to reconnect session');
+    }
+    
+    return response.data;
+  }
+
+  /**
+   * Sync all session statuses with WasenderAPI
+   */
+  static async syncAllStatuses(): Promise<{
+    synced_sessions: number;
+    updated_sessions: number;
+    deleted_sessions: number;
+    sessions: Array<{
+      session_id: string;
+      session_name: string;
+      old_status: string;
+      new_status: string;
+      updated: boolean;
+      reason?: string;
+    }>;
+  }> {
+    const response = await apiClient.post<{
+      synced_sessions: number;
+      updated_sessions: number;
+      deleted_sessions: number;
+      sessions: Array<{
+        session_id: string;
+        session_name: string;
+        old_status: string;
+        new_status: string;
+        updated: boolean;
+        reason?: string;
+      }>;
+    }>('/api/whatsapp/session/sync-all-statuses');
+    
+    if (response.status !== 'success' || !response.data) {
+      throw new Error(response.message || 'Failed to sync session statuses');
+    }
+    
+    return response.data;
+  }
+
+  /**
    * Poll session status until connected or timeout
    * @param sessionId Session ID to poll
    * @param onStatusUpdate Callback for status updates
@@ -239,8 +372,10 @@ export class WhatsAppSessionAPI {
         return { label: 'Expired', color: 'gray', icon: 'alert-circle' };
       case 'failed':
         return { label: 'Failed', color: 'red', icon: 'alert-circle' };
+      case 'logged_out':
+        return { label: 'Logged Out', color: 'orange', icon: 'alert-circle' };
       default:
-        return { label: status, color: 'gray' };
+        return { label: status.charAt(0).toUpperCase() + status.slice(1), color: 'gray' };
     }
   }
 

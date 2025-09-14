@@ -231,6 +231,39 @@ export function QRCodeScanner({
               </ol>
             </div>
 
+            {/* Webhook Configuration Info */}
+            {qrData.webhook_url && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <h4 className="font-medium text-blue-900 mb-2 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  Webhook Configuration
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="text-blue-700 font-medium">Endpoint:</span>
+                    <code className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-mono break-all">
+                      {qrData.webhook_url}
+                    </code>
+                  </div>
+                  {qrData.webhook_events && qrData.webhook_events.length > 0 && (
+                    <div>
+                      <span className="text-blue-700 font-medium">Events:</span>
+                      <div className="ml-2 flex flex-wrap gap-1 mt-1">
+                        {qrData.webhook_events.map((event, index) => (
+                          <Badge key={index} variant="outline" className="text-xs bg-blue-100 text-blue-700 border-blue-300">
+                            {event}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-blue-600 text-xs">
+                    Real-time updates will be sent to this endpoint when your session status changes.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Status and Actions */}
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">

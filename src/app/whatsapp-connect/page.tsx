@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Smartphone, CheckCircle, AlertCircle, RefreshCw, Trash2, Clock, Plus } from 'lucide-react';
+import { Smartphone, CheckCircle, AlertCircle, RefreshCw, Trash2, Clock, Plus, Activity, Power, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import { useAuthStore } from '@/lib/stores/auth';
 import { useToast } from '@/hooks/use-toast';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { QRCodeScanner } from '@/components/whatsapp/qr-code-scanner';
-import { WhatsAppSessionAPI, WhatsAppSession, QRCodeData, SessionStatus } from '@/lib/api/whatsapp-session';
+import { WhatsAppSessionAPI, WhatsAppSession, QRCodeData, SessionStatus, HealthCheckResult, LiveSessionStatus } from '@/lib/api/whatsapp-session';
 
 // Types are now imported from the API module
 
@@ -22,6 +22,9 @@ export default function WhatsAppConnectPage() {
   const [loading, setLoading] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [sessionName, setSessionName] = useState('');
+  const [healthData, setHealthData] = useState<HealthCheckResult | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
   
   useEffect(() => {
     if (user && token) {
@@ -29,15 +32,166 @@ export default function WhatsAppConnectPage() {
     }
   }, [user, token]);
 
+  // Auto-sync sessions every 30 seconds
+  useEffect(() => {
+    if (!autoSyncEnabled || !user || !token) return;
+
+    const syncInterval = setInterval(async () => {
+      try {
+        const syncResult = await WhatsAppSessionAPI.syncAllStatuses();
+        
+        // If any sessions were updated, refresh the sessions list
+        if (syncResult.updated_sessions > 0 || syncResult.deleted_sessions > 0) {
+          console.log('🔄 Auto-sync: Sessions updated, refreshing list');
+          loadSessions();
+          
+          // Show toast for significant changes
+          if (syncResult.updated_sessions > 0) {
+            toast({
+              title: "Sessions updated",
+              description: `${syncResult.updated_sessions} session(s) status changed`,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Auto-sync failed:', error);
+        // Don't show error toast for auto-sync failures to avoid spam
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(syncInterval);
+  }, [autoSyncEnabled, user, token, toast]);
+
   const loadSessions = async () => {
     try {
       const data = await WhatsAppSessionAPI.listSessions();
+      console.log('🔍 DEBUG - API Response:', data);
+      console.log('🔍 DEBUG - Sessions:', data.sessions);
+      if (data.sessions && data.sessions.length > 0) {
+        console.log('🔍 DEBUG - First session:', data.sessions[0]);
+        console.log('🔍 DEBUG - First session webhook_url:', data.sessions[0].webhook_url);
+        console.log('🔍 DEBUG - First session metadata:', data.sessions[0].metadata);
+      }
       setSessions(data.sessions || []);
     } catch (err) {
       console.error('Error loading sessions:', err);
       toast({
         title: "Failed to load WhatsApp sessions",
         description: err instanceof Error ? err.message : 'Please check your connection and try again.',
+        variant: "destructive",
+      });
+    }
+  };
+
+  const performHealthCheck = async () => {
+    setHealthLoading(true);
+    try {
+      const health = await WhatsAppSessionAPI.healthCheck();
+      setHealthData(health);
+      
+      // Update sessions with health info
+      setSessions(prev => prev.map(session => {
+        const healthInfo = health.sessions.find(h => h.session_id === session.session_id);
+        if (healthInfo && healthInfo.live_status && healthInfo.live_status !== session.status) {
+          return { ...session, status: healthInfo.live_status as any };
+        }
+        return session;
+      }));
+
+      toast({
+        title: "Health check completed",
+        description: `${health.connected}/${health.total_sessions} sessions are healthy`,
+      });
+    } catch (err) {
+      console.error('Error performing health check:', err);
+      toast({
+        title: "Health check failed",
+        description: err instanceof Error ? err.message : 'Please try again.',
+        variant: "destructive",
+      });
+    } finally {
+      setHealthLoading(false);
+    }
+  };
+
+  const performManualSync = async () => {
+    setHealthLoading(true);
+    try {
+      const syncResult = await WhatsAppSessionAPI.syncAllStatuses();
+      
+      // Refresh sessions list
+      loadSessions();
+      
+      toast({
+        title: "Sync completed",
+        description: `${syncResult.synced_sessions} sessions synced, ${syncResult.updated_sessions} updated, ${syncResult.deleted_sessions} removed`,
+      });
+    } catch (err) {
+      console.error('Error performing manual sync:', err);
+      toast({
+        title: "Sync failed",
+        description: err instanceof Error ? err.message : 'Please try again.',
+        variant: "destructive",
+      });
+    } finally {
+      setHealthLoading(false);
+    }
+  };
+
+  const disconnectSession = async (sessionId: string) => {
+    if (!confirm('Are you sure you want to disconnect this WhatsApp session?')) {
+      return;
+    }
+
+    try {
+      await WhatsAppSessionAPI.disconnectSession(sessionId);
+
+      // Update session status locally
+      setSessions(prev => prev.map(session => 
+        session.session_id === sessionId 
+          ? { ...session, status: 'expired' }
+          : session
+      ));
+
+      toast({
+        title: "Session disconnected",
+        description: "WhatsApp session has been successfully disconnected.",
+      });
+    } catch (err) {
+      console.error('Error disconnecting session:', err);
+      toast({
+        title: "Failed to disconnect session",
+        description: err instanceof Error ? err.message : 'Please try again.',
+        variant: "destructive",
+      });
+    }
+  };
+
+  const checkLiveStatus = async (sessionId: string) => {
+    try {
+      const liveStatus = await WhatsAppSessionAPI.checkLiveStatus(sessionId);
+      
+      // Update session with live status
+      setSessions(prev => prev.map(session => 
+        session.session_id === sessionId 
+          ? { 
+              ...session, 
+              status: liveStatus.live_status as any,
+              phone_number: liveStatus.phone_number || session.phone_number,
+              connected_at: liveStatus.connected_at || session.connected_at
+            }
+          : session
+      ));
+
+      toast({
+        title: "Status updated",
+        description: `Live status: ${liveStatus.live_status}`,
+      });
+    } catch (err) {
+      console.error('Error checking live status:', err);
+      toast({
+        title: "Failed to check live status",
+        description: err instanceof Error ? err.message : 'Please try again.',
         variant: "destructive",
       });
     }
@@ -118,32 +272,50 @@ export default function WhatsAppConnectPage() {
     setLoading(true);
 
     try {
-      const refreshedData = await WhatsAppSessionAPI.refreshQRCode(sessionId);
-      
-      // Check if session is already connected
-      if (refreshedData.message === 'Session is already connected') {
-        toast({
-          title: "Session Already Connected",
-          description: "This WhatsApp session is already connected and active.",
-          variant: "default",
-        });
-        
-        // Update session status in the list
-        setSessions(prev => prev.map(session => 
-          session.session_id === sessionId 
-            ? { ...session, status: 'connected' }
-            : session
-        ));
-        
-        setCurrentQR(null); // Clear QR display since it's connected
-        
-        // Refresh the session list to get updated status
-        loadSessions();
-        return;
-      }
-      
-      // Find the session to get its name
+      // Find the session to determine if it needs reconnection or just QR refresh
       const session = sessions.find(s => s.session_id === sessionId);
+      const needsReconnection = session?.status === 'expired' || session?.status === 'failed' || session?.status === 'logged_out';
+      
+      let refreshedData;
+      
+      if (needsReconnection) {
+        // Use reconnect endpoint for expired/failed sessions
+        refreshedData = await WhatsAppSessionAPI.reconnectSession(sessionId);
+        toast({
+          title: "Reconnection initiated",
+          description: "Session reconnection started. Please scan the QR code.",
+        });
+      } else {
+        // Use regular QR refresh for pending sessions
+        refreshedData = await WhatsAppSessionAPI.refreshQRCode(sessionId);
+        
+        // Check if session is already connected
+        if (refreshedData.message === 'Session is already connected') {
+          toast({
+            title: "Session Already Connected",
+            description: "This WhatsApp session is already connected and active.",
+            variant: "default",
+          });
+          
+          // Update session status in the list
+          setSessions(prev => prev.map(session => 
+            session.session_id === sessionId 
+              ? { ...session, status: 'connected' }
+              : session
+          ));
+          
+          setCurrentQR(null); // Clear QR display since it's connected
+          
+          // Refresh the session list to get updated status
+          loadSessions();
+          return;
+        }
+        
+        toast({
+          title: "QR Code refreshed",
+          description: "New QR code generated. Please scan with your WhatsApp.",
+        });
+      }
       
       // Create or update current QR with refreshed data
       const qrData = {
@@ -158,6 +330,13 @@ export default function WhatsAppConnectPage() {
       
       setCurrentQR(qrData);
 
+      // Update session status to pending
+      setSessions(prev => prev.map(s => 
+        s.session_id === sessionId 
+          ? { ...s, status: 'pending' }
+          : s
+      ));
+
       // Debug: Log QR data to console
       console.log('QR Data received:', qrData);
       console.log('QR Code length:', qrData.qr_code?.length || 0);
@@ -166,10 +345,6 @@ export default function WhatsAppConnectPage() {
       console.log('Expires at:', qrData.expires_at);
       console.log('Is expired?', qrData.expires_at ? new Date(qrData.expires_at) < new Date() : false);
 
-      toast({
-        title: "QR Code refreshed",
-        description: "New QR code generated. Please scan with your WhatsApp.",
-      });
     } catch (err) {
       console.error('Error refreshing QR:', err);
       
@@ -262,6 +437,8 @@ export default function WhatsAppConnectPage() {
         return <Badge className="bg-gray-100 text-gray-800"><AlertCircle className="w-3 h-3 mr-1" />{statusInfo.label}</Badge>;
       case 'failed':
         return <Badge className="bg-red-100 text-red-800"><AlertCircle className="w-3 h-3 mr-1" />{statusInfo.label}</Badge>;
+      case 'logged_out':
+        return <Badge className="bg-orange-100 text-orange-800"><AlertCircle className="w-3 h-3 mr-1" />{statusInfo.label}</Badge>;
       default:
         return <Badge variant="outline">{statusInfo.label}</Badge>;
     }
@@ -342,13 +519,113 @@ export default function WhatsAppConnectPage() {
         </div>
       )}
 
+      {/* Health Dashboard */}
+      {sessions.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="w-5 h-5" />
+                  Session Health Dashboard
+                </CardTitle>
+                <CardDescription>
+                  Monitor the status of all your WhatsApp sessions
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={performHealthCheck}
+                  disabled={healthLoading}
+                  variant="outline"
+                  size="sm"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${healthLoading ? 'animate-spin' : ''}`} />
+                  {healthLoading ? 'Checking...' : 'Health Check'}
+                </Button>
+                <Button
+                  onClick={performManualSync}
+                  disabled={healthLoading}
+                  variant="outline"
+                  size="sm"
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${healthLoading ? 'animate-spin' : ''}`} />
+                  Sync Now
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="auto-sync"
+                  checked={autoSyncEnabled}
+                  onChange={(e) => setAutoSyncEnabled(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="auto-sync" className="text-sm text-gray-600">
+                  Auto-sync every 30 seconds
+                </label>
+              </div>
+              {autoSyncEnabled && (
+                <div className="text-xs text-green-600 flex items-center">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
+                  Auto-sync active
+                </div>
+              )}
+            </div>
+            {healthData ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{healthData.connected}</div>
+                  <div className="text-sm text-green-700">Connected</div>
+                </div>
+                <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                  <div className="text-2xl font-bold text-yellow-600">{healthData.pending}</div>
+                  <div className="text-sm text-yellow-700">Pending</div>
+                </div>
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-600">{healthData.expired}</div>
+                  <div className="text-sm text-gray-700">Expired</div>
+                </div>
+                <div className="text-center p-4 bg-red-50 rounded-lg">
+                  <div className="text-2xl font-bold text-red-600">{healthData.failed}</div>
+                  <div className="text-sm text-red-700">Failed</div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                Click "Health Check" to monitor session status
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Sessions List */}
       <Card>
         <CardHeader>
-          <CardTitle>Your WhatsApp Sessions</CardTitle>
-          <CardDescription>
-            Manage your connected WhatsApp accounts
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Your WhatsApp Sessions</CardTitle>
+              <CardDescription>
+                Manage your connected WhatsApp accounts
+              </CardDescription>
+            </div>
+            <Button
+              onClick={loadSessions}
+              disabled={loading}
+              size="sm"
+              variant="outline"
+              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh Sessions
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {sessions.length === 0 ? (
@@ -378,21 +655,68 @@ export default function WhatsAppConnectPage() {
                       {session.phone_number && (
                         <p>Phone: {session.phone_number}</p>
                       )}
+                      {session.webhook_url && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-xs text-green-600 font-medium">Webhook Active</span>
+                          <code className="text-xs bg-gray-100 px-1 py-0.5 rounded font-mono">
+                            {session.webhook_url.split('/').pop()}
+                          </code>
+                        </div>
+                      )}
+                      {/* Debug info - remove in production */}
+                      {process.env.NODE_ENV === 'development' && (
+                        <details className="mt-2">
+                          <summary className="text-xs text-gray-400 cursor-pointer">Debug Info</summary>
+                          <pre className="text-xs bg-gray-50 p-2 rounded mt-1 overflow-auto">
+                            {JSON.stringify({
+                              webhook_url: session.webhook_url,
+                              has_metadata: !!session.metadata,
+                              webhook_config: session.metadata?.webhook_config
+                            }, null, 2)}
+                          </pre>
+                        </details>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {session.status === 'pending' && (
+                    {(session.status === 'pending' || session.status === 'expired' || session.status === 'failed' || session.status === 'logged_out') && (
                       <Button
                         onClick={() => refreshQR(session.session_id)}
                         disabled={loading}
                         size="sm"
                         variant="outline"
+                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
                       >
                         <RefreshCw className="w-4 h-4 mr-1" />
-                        Show QR
+                        {session.status === 'pending' ? 'Show QR' : 'Reconnect'}
                       </Button>
                     )}
+                    
+                    {session.status === 'connected' && (
+                      <Button
+                        onClick={() => disconnectSession(session.session_id)}
+                        disabled={loading}
+                        size="sm"
+                        variant="outline"
+                        className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                      >
+                        <Power className="w-4 h-4 mr-1" />
+                        Disconnect
+                      </Button>
+                    )}
+                    
+                    <Button
+                      onClick={() => checkLiveStatus(session.session_id)}
+                      disabled={loading}
+                      size="sm"
+                      variant="outline"
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    >
+                      <Wifi className="w-4 h-4 mr-1" />
+                      Check Status
+                    </Button>
                     
                     <Button
                       onClick={() => deleteSession(session.session_id)}
