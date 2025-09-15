@@ -116,11 +116,43 @@ export interface ApiResponse<T = any> {
   message?: string;
 }
 
+export interface ExistingSessionCheck {
+  has_session: boolean;
+  session?: WhatsAppSession & {
+    live_status?: string;
+  };
+}
+
+export interface WebhookConfig {
+  webhook_url: string;
+  webhook_enabled: boolean;
+  webhook_events: string[];
+}
+
+export interface UpdateWebhookRequest {
+  webhook_url?: string;
+  webhook_enabled?: boolean;
+  webhook_events?: string[];
+}
+
 /**
  * WhatsApp Session API Client
  */
 export class WhatsAppSessionAPI {
   
+  /**
+   * Check if tenant has an existing WhatsApp session
+   */
+  static async checkExistingSession(): Promise<ExistingSessionCheck> {
+    const response = await apiClient.get<ExistingSessionCheck>('/api/whatsapp/session/check-existing');
+    
+    if (response.status !== 'success' || !response.data) {
+      throw new Error(response.message || 'Failed to check existing session');
+    }
+    
+    return response.data;
+  }
+
   /**
    * Check existing sessions or create a new WhatsApp session and get QR code
    */
@@ -384,6 +416,32 @@ export class WhatsAppSessionAPI {
    */
   static formatDateTime(dateStr: string): string {
     return new Date(dateStr).toLocaleString();
+  }
+
+  /**
+   * Get webhook configuration for a session
+   */
+  static async getWebhookConfig(sessionId: string): Promise<WebhookConfig> {
+    const response = await apiClient.get<WebhookConfig>(`/api/whatsapp/session/webhook/${sessionId}`);
+    
+    if (response.status !== 'success' || !response.data) {
+      throw new Error(response.message || 'Failed to get webhook configuration');
+    }
+    
+    return response.data;
+  }
+
+  /**
+   * Update webhook configuration for a session
+   */
+  static async updateWebhookConfig(sessionId: string, config: UpdateWebhookRequest): Promise<WebhookConfig> {
+    const response = await apiClient.put<WebhookConfig>(`/api/whatsapp/session/webhook/${sessionId}`, config);
+    
+    if (response.status !== 'success' || !response.data) {
+      throw new Error(response.message || 'Failed to update webhook configuration');
+    }
+    
+    return response.data;
   }
 
   /**

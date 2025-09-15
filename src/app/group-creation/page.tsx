@@ -19,11 +19,16 @@ import {
   Send,
   MessageSquare,
   // Calendar,
-  // Eye,
+  Eye,
   RefreshCw,
   Copy,
   Clock,
-  Repeat
+  Repeat,
+  Building2,
+  Shield,
+  MessageCircle,
+  Image,
+  CheckCircle2
 } from 'lucide-react';
 
 interface Contact {
@@ -32,10 +37,23 @@ interface Contact {
   notify?: string;
   verified_name?: string;
   phone_number: string;
-  jid: string;
-  display_name: string;
-  is_business: boolean;
+  jid?: string;
+  wasender_jid?: string;
+  display_name?: string;
+  is_business_account?: boolean;
   status?: string;
+  profile_image_url?: string;
+  whatsapp_status?: string;
+  raw_wasender_data?: {
+    raw_data?: {
+      id?: string;
+      name?: string;
+      notify?: string;
+      verifiedName?: string;
+      imgUrl?: string;
+      status?: string;
+    };
+  };
 }
 
 interface PaginationInfo {
@@ -127,6 +145,23 @@ interface ScheduleMessageResponse {
   error?: string;
 }
 
+// Helper function to get the best available contact information
+const getContactInfo = (contact: Contact) => {
+  const rawData = contact.raw_wasender_data?.raw_data;
+  
+  return {
+    name: contact.verified_name || rawData?.verifiedName || contact.name || rawData?.name || contact.notify || rawData?.notify || null,
+    displayName: contact.notify || rawData?.notify || contact.name || rawData?.name || null,
+    verifiedName: contact.verified_name || rawData?.verifiedName || null,
+    profileImage: contact.profile_image_url || rawData?.imgUrl || null,
+    status: contact.whatsapp_status || rawData?.status || contact.status || null,
+    phoneNumber: contact.phone_number,
+    jid: contact.wasender_jid || contact.jid || rawData?.id || null,
+    isBusiness: contact.is_business_account || false,
+    hasProfileImage: !!(contact.profile_image_url || rawData?.imgUrl) && (contact.profile_image_url !== 'changed' && rawData?.imgUrl !== 'changed')
+  };
+};
+
 export default function GroupCreationPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -135,6 +170,10 @@ export default function GroupCreationPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
+  
+  // Profile picture cache
+  const [profilePictureCache, setProfilePictureCache] = useState<Record<string, string | null>>({});
+  const [loadingProfilePictures, setLoadingProfilePictures] = useState<Set<string>>(new Set());
 
   // Groups management state
   const [groups, setGroups] = useState<Group[]>([]);
@@ -157,6 +196,56 @@ export default function GroupCreationPage() {
 
   // Manual contact sync state
   const [isSyncingContacts, setIsSyncingContacts] = useState(false);
+
+  // Fetch profile picture for a contact
+  const fetchProfilePicture = async (phoneNumber: string) => {
+    // Check cache first
+    if (profilePictureCache[phoneNumber] !== undefined) {
+      return profilePictureCache[phoneNumber];
+    }
+
+    // Check if already loading
+    if (loadingProfilePictures.has(phoneNumber)) {
+      return null;
+    }
+
+    // Mark as loading
+    setLoadingProfilePictures(prev => new Set(prev).add(phoneNumber));
+
+    try {
+      const cleanPhone = phoneNumber.replace('@s.whatsapp.net', '').replace('@c.us', '');
+      const response = await fetch(`${API_BASE}/api/group-messaging/contacts/${cleanPhone}/picture`);
+      const data = await response.json();
+
+      let pictureUrl = null;
+      if (data.success && data.data?.profile_picture_url) {
+        pictureUrl = data.data.profile_picture_url;
+      }
+
+      // Cache the result (even if null)
+      setProfilePictureCache(prev => ({
+        ...prev,
+        [phoneNumber]: pictureUrl
+      }));
+
+      return pictureUrl;
+    } catch (error) {
+      console.error(`Failed to fetch profile picture for ${phoneNumber}:`, error);
+      // Cache null result to avoid repeated requests
+      setProfilePictureCache(prev => ({
+        ...prev,
+        [phoneNumber]: null
+      }));
+      return null;
+    } finally {
+      // Remove from loading set
+      setLoadingProfilePictures(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(phoneNumber);
+        return newSet;
+      });
+    }
+  };
 
   // Manual contact sync function (now efficient)
   const syncContactsFromWasender = async () => {
@@ -263,12 +352,26 @@ export default function GroupCreationPage() {
   const loadGroups = async () => {
     setIsLoadingGroups(true);
     try {
-      const response = await fetch(`${API_BASE}/api/group-messaging/groups`);
+      // Add cache-busting timestamp to ensure fresh data
+      const response = await fetch(`${API_BASE}/api/group-messaging/groups?_t=${Date.now()}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       const data: GroupsResponse = await response.json();
 
       if (data.success) {
+        console.log('Groups API Response:', data);
+        console.log('Groups data:', data.data.groups);
+        data.data.groups.forEach((group, index) => {
+          console.log(`Group ${index}: ${group.name} - ${group.member_count} members`);
+        });
         setGroups(data.data.groups);
       } else {
+        console.error('Failed to load groups:', data);
         toast.error('Failed to load groups');
       }
     } catch (error) {
@@ -404,6 +507,69 @@ export default function GroupCreationPage() {
       return now.toTimeString().slice(0, 5);
     }
     return '';
+  };
+
+  // Profile Image Component
+  const ProfileImage: React.FC<{ contact: Contact; size?: 'sm' | 'md' }> = ({ contact, size = 'md' }) => {
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [hasError, setHasError] = useState(false);
+    
+    const contactInfo = getContactInfo(contact);
+    const sizeClasses = size === 'sm' ? 'w-8 h-8' : 'w-10 h-10';
+    const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
+    
+    useEffect(() => {
+      const loadProfilePicture = async () => {
+        if (!contactInfo.phoneNumber) return;
+        
+        // Check cache first
+        const cached = profilePictureCache[contactInfo.phoneNumber];
+        if (cached !== undefined) {
+          setImageUrl(cached);
+          return;
+        }
+        
+        setIsLoading(true);
+        try {
+          const url = await fetchProfilePicture(contactInfo.phoneNumber);
+          setImageUrl(url);
+        } catch (error) {
+          console.error('Error loading profile picture:', error);
+          setHasError(true);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      loadProfilePicture();
+    }, [contactInfo.phoneNumber, profilePictureCache]);
+    
+    if (isLoading) {
+      return (
+        <div className={`${sizeClasses} rounded-full bg-gray-200 animate-pulse flex items-center justify-center`}>
+          <Loader2 className={`${iconSize} text-gray-400 animate-spin`} />
+        </div>
+      );
+    }
+    
+    if (imageUrl && !hasError) {
+      return (
+        <img
+          src={imageUrl}
+          alt={contactInfo.name || 'Profile'}
+          className={`${sizeClasses} rounded-full object-cover border-2 border-gray-200`}
+          onError={() => setHasError(true)}
+        />
+      );
+    }
+    
+    // Fallback avatar
+    return (
+      <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center`}>
+        <User className={`${iconSize} text-white`} />
+      </div>
+    );
   };
 
   // Copy group JID to clipboard
@@ -604,39 +770,86 @@ export default function GroupCreationPage() {
                 <>
                   {contacts.map((contact) => {
                     const isSelected = selectedContacts.some(c => c.id === contact.id);
+                    const contactInfo = getContactInfo(contact);
+                    
                     return (
                       <div
                         key={contact.id}
-                        className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
                           isSelected 
-                            ? 'bg-blue-50 border-blue-200' 
-                            : 'hover:bg-gray-50 border-gray-200'
+                            ? 'bg-blue-50 border-blue-200 shadow-sm' 
+                            : 'hover:bg-gray-50 border-gray-200 hover:shadow-sm'
                         }`}
                         onClick={() => toggleContactSelection(contact)}
                       >
                         <Checkbox
                           checked={isSelected}
                           onChange={() => {}}
-                          className="pointer-events-none"
+                          className="pointer-events-none mt-1"
                         />
+                        
+                        {/* Profile Image */}
+                        <div className="flex-shrink-0">
+                          <ProfileImage contact={contact} size="md" />
+                        </div>
+
+                        {/* Contact Details */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-gray-400" />
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {contact.notify || contact.verified_name || contact.name || `Contact ${contact.phone_number}`}
+                          {/* Primary Name and Badges */}
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {contactInfo.name || `Contact ${contactInfo.phoneNumber}`}
                             </p>
-                            {contact.is_business && (
-                              <Badge variant="secondary" className="text-xs">
-                                Business
-                              </Badge>
-                            )}
+                            
+                            {/* Badges */}
+                            <div className="flex items-center gap-1">
+                              {contactInfo.verifiedName && (
+                                <Badge variant="default" className="text-xs bg-green-100 text-green-800 border-green-200">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Verified
+                                </Badge>
+                              )}
+                              {contactInfo.isBusiness && (
+                                <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+                                  <Building2 className="h-3 w-3 mr-1" />
+                                  Business
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
+
+                          {/* Secondary Info */}
+                          {contactInfo.displayName && contactInfo.displayName !== contactInfo.name && (
+                            <div className="flex items-center gap-1 mb-1">
+                              <User className="h-3 w-3 text-gray-400" />
+                              <p className="text-xs text-gray-600 truncate">
+                                Display: {contactInfo.displayName}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Phone Number */}
+                          <div className="flex items-center gap-1 mb-1">
                             <Phone className="h-3 w-3 text-gray-400" />
-                            <p className="text-xs text-gray-500">
-                              {contact.phone_number}
+                            <p className="text-xs text-gray-600 font-mono">
+                              {contactInfo.phoneNumber}
                             </p>
                           </div>
+
+                          {/* WhatsApp Status */}
+                          {contactInfo.status && (
+                            <div className="flex items-start gap-1">
+                              <MessageCircle className="h-3 w-3 text-gray-400 mt-0.5 flex-shrink-0" />
+                              <p className="text-xs text-gray-500 leading-relaxed" style={{ 
+                                display: '-webkit-box', 
+                                WebkitLineClamp: 2, 
+                                WebkitBoxOrient: 'vertical', 
+                                overflow: 'hidden' 
+                              }}>
+                                {contactInfo.status}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -667,10 +880,28 @@ export default function GroupCreationPage() {
               )}
             </div>
 
-            {/* Pagination Info */}
+            {/* Contact Statistics */}
             {pagination && (
-              <div className="text-xs text-gray-500 text-center">
-                Showing {pagination.returned} of {pagination.total} contacts
+              <div className="text-xs text-gray-500 text-center space-y-1">
+                <div>
+                  Showing {pagination.returned} of {pagination.total} contacts
+                </div>
+                {contacts.length > 0 && (
+                  <div className="flex justify-center gap-4">
+                    <span>
+                      🏢 {contacts.filter(c => getContactInfo(c).isBusiness).length} Business
+                    </span>
+                    <span>
+                      ✅ {contacts.filter(c => getContactInfo(c).verifiedName).length} Verified
+                    </span>
+                    <span>
+                      📷 {contacts.filter(c => {
+                        const info = getContactInfo(c);
+                        return profilePictureCache[info.phoneNumber] !== null && profilePictureCache[info.phoneNumber] !== undefined;
+                      }).length} With Photos
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -708,32 +939,48 @@ export default function GroupCreationPage() {
                     No contacts selected
                   </div>
                 ) : (
-                  selectedContacts.map((contact) => (
-                    <div
-                      key={contact.id}
-                      className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200"
-                    >
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-blue-600" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {contact.notify || contact.verified_name || contact.name || `Contact ${contact.phone_number}`}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {contact.phone_number}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeSelectedContact(contact.id)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                  selectedContacts.map((contact) => {
+                    const contactInfo = getContactInfo(contact);
+                    return (
+                      <div
+                        key={contact.id}
+                        className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200"
                       >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))
+                        <div className="flex items-center gap-3">
+                          {/* Profile Image */}
+                          <div className="flex-shrink-0">
+                            <ProfileImage contact={contact} size="sm" />
+                          </div>
+                          
+                          {/* Contact Info */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {contactInfo.name || `Contact ${contactInfo.phoneNumber}`}
+                              </p>
+                              {contactInfo.verifiedName && (
+                                <CheckCircle2 className="h-3 w-3 text-green-600" />
+                              )}
+                              {contactInfo.isBusiness && (
+                                <Building2 className="h-3 w-3 text-blue-600" />
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-600 font-mono">
+                              {contactInfo.phoneNumber}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeSelectedContact(contact.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -817,10 +1064,10 @@ export default function GroupCreationPage() {
                             {group.name}
                           </h3>
                           <p className="text-sm text-gray-500 mt-1">
-                            {group.member_count} members
+                            {group.member_count || 0} members
                           </p>
                           <p className="text-xs text-gray-400 mt-1">
-                            Created: {new Date(group.created_at).toLocaleDateString()}
+                            Created: {group.created_at ? new Date(group.created_at).toLocaleDateString() : 'Unknown'}
                           </p>
                         </div>
                         <Badge 
@@ -847,6 +1094,15 @@ export default function GroupCreationPage() {
                       </div>
 
                       <div className="space-y-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => window.open(`/groups/${encodeURIComponent(group.group_jid)}`, '_blank')}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </Button>
                         <Button
                           variant="default"
                           size="sm"

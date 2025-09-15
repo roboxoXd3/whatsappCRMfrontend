@@ -37,9 +37,7 @@ const UserDetailPage = async ({ params }: PageProps) => {
   if (!user) return notFound();
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <UserDetailCard user={user} stats={stats} activity={activity} />
-    </div>
+    <UserDetailCard user={user} stats={stats} activity={activity} />
   );
 };
 
