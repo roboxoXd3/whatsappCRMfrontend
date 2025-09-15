@@ -123,16 +123,57 @@ export interface ExistingSessionCheck {
   };
 }
 
+// Available webhook events from WasenderAPI
+export const AVAILABLE_WEBHOOK_EVENTS = [
+  // Core messaging events
+  "message.sent",
+  "messages.received", 
+  "messages.upsert",
+  "messages.update",
+  "messages.delete",
+  "message-receipt.update",
+  "messages.reaction",
+  
+  // Session events
+  "session.status",
+  "qrcode.updated",
+  
+  // Chat events
+  "chats.upsert",
+  "chats.update", 
+  "chats.delete",
+  
+  // Group events
+  "groups.upsert",
+  "groups.update",
+  "group-participants.update",
+  
+  // Contact events
+  "contacts.upsert",
+  "contacts.update",
+  
+  // Poll events
+  "poll.results"
+] as const;
+
+export type WebhookEventType = typeof AVAILABLE_WEBHOOK_EVENTS[number];
+
+export interface WebhookEventInfo {
+  available_events: WebhookEventType[];
+  default_events: WebhookEventType[];
+  event_descriptions: Record<WebhookEventType, string>;
+}
+
 export interface WebhookConfig {
   webhook_url: string;
   webhook_enabled: boolean;
-  webhook_events: string[];
+  webhook_events: WebhookEventType[];
 }
 
 export interface UpdateWebhookRequest {
   webhook_url?: string;
   webhook_enabled?: boolean;
-  webhook_events?: string[];
+  webhook_events?: WebhookEventType[];
 }
 
 /**
@@ -439,6 +480,19 @@ export class WhatsAppSessionAPI {
     
     if (response.status !== 'success' || !response.data) {
       throw new Error(response.message || 'Failed to update webhook configuration');
+    }
+    
+    return response.data;
+  }
+
+  /**
+   * Get available webhook events and descriptions
+   */
+  static async getAvailableWebhookEvents(): Promise<WebhookEventInfo> {
+    const response = await apiClient.get<WebhookEventInfo>('/api/whatsapp/webhook/available-events');
+    
+    if (response.status !== 'success' || !response.data) {
+      throw new Error(response.message || 'Failed to get available webhook events');
     }
     
     return response.data;

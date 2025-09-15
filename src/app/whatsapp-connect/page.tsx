@@ -10,7 +10,7 @@ import { useAuthStore } from '@/lib/stores/auth';
 import { useToast } from '@/hooks/use-toast';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { QRCodeScanner } from '@/components/whatsapp/qr-code-scanner';
-import { WhatsAppSessionAPI, WhatsAppSession, QRCodeData, SessionStatus, HealthCheckResult, LiveSessionStatus, ExistingSessionCheck, WebhookConfig, UpdateWebhookRequest } from '@/lib/api/whatsapp-session';
+import { WhatsAppSessionAPI, WhatsAppSession, QRCodeData, SessionStatus, HealthCheckResult, LiveSessionStatus, ExistingSessionCheck, WebhookConfig, UpdateWebhookRequest, WebhookEventInfo, WebhookEventType, AVAILABLE_WEBHOOK_EVENTS } from '@/lib/api/whatsapp-session';
 
 // Types are now imported from the API module
 
@@ -33,18 +33,29 @@ export default function WhatsAppConnectPage() {
   const [currentWebhookSession, setCurrentWebhookSession] = useState<string | null>(null);
   const [webhookConfig, setWebhookConfig] = useState<WebhookConfig | null>(null);
   const [webhookLoading, setWebhookLoading] = useState(false);
+  const [webhookEventInfo, setWebhookEventInfo] = useState<WebhookEventInfo | null>(null);
   const [webhookForm, setWebhookForm] = useState({
     webhook_url: '',
     webhook_enabled: false,
-    webhook_events: [] as string[]
+    webhook_events: [] as WebhookEventType[]
   });
   
   useEffect(() => {
     if (user && token) {
       loadSessions();
       checkExistingSession();
+      loadWebhookEventInfo();
     }
   }, [user, token]);
+
+  const loadWebhookEventInfo = async () => {
+    try {
+      const eventInfo = await WhatsAppSessionAPI.getAvailableWebhookEvents();
+      setWebhookEventInfo(eventInfo);
+    } catch (err) {
+      console.error('Error loading webhook event info:', err);
+    }
+  };
 
   // Auto-sync sessions every 30 seconds
   useEffect(() => {
@@ -485,8 +496,10 @@ export default function WhatsAppConnectPage() {
       setWebhookConfig(config);
       setWebhookForm({
         webhook_url: config.webhook_url || '',
-        webhook_enabled: config.webhook_enabled || false,
-        webhook_events: config.webhook_events || []
+        webhook_enabled: config.webhook_enabled !== false, // Default to true if not explicitly false
+        webhook_events: config.webhook_events && config.webhook_events.length > 0 
+          ? config.webhook_events 
+          : (webhookEventInfo?.available_events || [...AVAILABLE_WEBHOOK_EVENTS])
       });
     } catch (err) {
       console.error('Error loading webhook config:', err);
@@ -495,11 +508,11 @@ export default function WhatsAppConnectPage() {
         description: err instanceof Error ? err.message : 'Please try again.',
         variant: "destructive",
       });
-      // Set default values
+      // Set default values with all events enabled by default
       setWebhookForm({
         webhook_url: '',
-        webhook_enabled: false,
-        webhook_events: []
+        webhook_enabled: true,
+        webhook_events: webhookEventInfo?.available_events || [...AVAILABLE_WEBHOOK_EVENTS]
       });
     } finally {
       setWebhookLoading(false);
@@ -512,8 +525,8 @@ export default function WhatsAppConnectPage() {
     setWebhookConfig(null);
     setWebhookForm({
       webhook_url: '',
-      webhook_enabled: false,
-      webhook_events: []
+      webhook_enabled: true,
+      webhook_events: webhookEventInfo?.available_events || [...AVAILABLE_WEBHOOK_EVENTS]
     });
   };
 
@@ -552,12 +565,35 @@ export default function WhatsAppConnectPage() {
     }
   };
 
-  const toggleWebhookEvent = (event: string) => {
+  const toggleWebhookEvent = (event: WebhookEventType) => {
     setWebhookForm(prev => ({
       ...prev,
       webhook_events: prev.webhook_events.includes(event)
         ? prev.webhook_events.filter(e => e !== event)
         : [...prev.webhook_events, event]
+    }));
+  };
+
+  const selectAllWebhookEvents = () => {
+    if (!webhookEventInfo) return;
+    setWebhookForm(prev => ({
+      ...prev,
+      webhook_events: [...webhookEventInfo.available_events]
+    }));
+  };
+
+  const deselectAllWebhookEvents = () => {
+    setWebhookForm(prev => ({
+      ...prev,
+      webhook_events: []
+    }));
+  };
+
+  const selectDefaultWebhookEvents = () => {
+    if (!webhookEventInfo) return;
+    setWebhookForm(prev => ({
+      ...prev,
+      webhook_events: [...webhookEventInfo.default_events]
     }));
   };
 
@@ -1221,45 +1257,89 @@ export default function WhatsAppConnectPage() {
 
                       {/* Webhook Events */}
                       <div className="space-y-4">
-                        <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                          <Activity className="w-5 h-5 text-purple-600" />
-                          Webhook Events
-                        </h4>
-                        <p className="text-sm text-gray-600">Select which events you want to receive notifications for</p>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {[
-                            { id: 'messages.received', label: 'Messages Received', description: 'New incoming messages' },
-                            { id: 'messages.sent', label: 'Messages Sent', description: 'Outgoing message status' },
-                            { id: 'session.status', label: 'Session Status', description: 'Connection status changes' },
-                            { id: 'qrcode.updated', label: 'QR Code Updated', description: 'New QR code generated' },
-                            { id: 'messages.update', label: 'Message Updates', description: 'Message status updates' },
-                            { id: 'chats.update', label: 'Chat Updates', description: 'Chat information changes' }
-                          ].map((event) => (
-                            <div
-                              key={event.id}
-                              className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
-                                webhookForm.webhook_events.includes(event.id)
-                                  ? 'border-blue-300 bg-blue-50'
-                                  : 'border-gray-200 bg-white hover:border-gray-300'
-                              }`}
-                              onClick={() => toggleWebhookEvent(event.id)}
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                            <Activity className="w-5 h-5 text-purple-600" />
+                            Webhook Events
+                          </h4>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={selectAllWebhookEvents}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs"
                             >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h5 className="font-medium text-gray-900">{event.label}</h5>
-                                  <p className="text-xs text-gray-600 mt-1">{event.description}</p>
-                                </div>
-                                <input
-                                  type="checkbox"
-                                  checked={webhookForm.webhook_events.includes(event.id)}
-                                  onChange={() => toggleWebhookEvent(event.id)}
-                                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                                />
-                              </div>
-                            </div>
-                          ))}
+                              Select All
+                            </Button>
+                            <Button
+                              onClick={selectDefaultWebhookEvents}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs"
+                            >
+                              Default
+                            </Button>
+                            <Button
+                              onClick={deselectAllWebhookEvents}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs"
+                            >
+                              Clear All
+                            </Button>
+                          </div>
                         </div>
+                        <p className="text-sm text-gray-600">
+                          Select which events you want to receive notifications for. 
+                          {webhookEventInfo && (
+                            <span className="text-blue-600 ml-1">
+                              ({webhookForm.webhook_events.length}/{webhookEventInfo.available_events.length} selected)
+                            </span>
+                          )}
+                        </p>
+                        
+                        {webhookEventInfo ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
+                            {webhookEventInfo.available_events.map((event) => (
+                              <div
+                                key={event}
+                                className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+                                  webhookForm.webhook_events.includes(event)
+                                    ? 'border-blue-300 bg-blue-50'
+                                    : 'border-gray-200 bg-white hover:border-gray-300'
+                                }`}
+                                onClick={() => toggleWebhookEvent(event)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <h5 className="font-medium text-gray-900 text-sm truncate">
+                                      {event.replace(/\./g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                    </h5>
+                                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                                      {webhookEventInfo.event_descriptions[event]}
+                                    </p>
+                                    {webhookEventInfo.default_events.includes(event) && (
+                                      <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
+                                        Default
+                                      </span>
+                                    )}
+                                  </div>
+                                  <input
+                                    type="checkbox"
+                                    checked={webhookForm.webhook_events.includes(event)}
+                                    onChange={() => toggleWebhookEvent(event)}
+                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 ml-3"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center py-8">
+                            <RefreshCw className="w-5 h-5 animate-spin mr-2 text-gray-400" />
+                            <span className="text-gray-500">Loading available events...</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Action Buttons */}
