@@ -663,6 +663,18 @@ export default function WhatsAppConnectPage() {
             <div className="mb-8 sm:mb-12">
               <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
                 <CardContent className="p-6 sm:p-8">
+                  {/* Show QR Code Button */}
+                  <div className="flex justify-center mb-6">
+                    <Button
+                      onClick={() => refreshQR(currentQR.session_id)}
+                      disabled={loading}
+                      className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-3"
+                    >
+                      <RefreshCw className={`w-5 h-5 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                      {loading ? 'Refreshing QR Code...' : 'Show QR Code'}
+                    </Button>
+                  </div>
+                  
                   <QRCodeScanner
                     qrData={currentQR}
                     onStatusUpdate={handleStatusUpdate}
