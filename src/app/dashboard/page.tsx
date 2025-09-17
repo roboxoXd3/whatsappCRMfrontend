@@ -22,7 +22,9 @@ import {
   Calendar,
   ArrowUpRight,
   ArrowDownRight,
-  Loader2
+  Loader2,
+  Sparkles,
+  Zap
 } from 'lucide-react';
 
 // Import hooks for real data
@@ -31,6 +33,7 @@ import { useConversations, type Conversation } from '@/lib/hooks/use-conversatio
 import { useCampaigns, type Campaign } from '@/lib/hooks/use-campaigns';
 import { useTasks } from '@/hooks/useCRM';
 import LeadQualificationWidget from '@/components/dashboard/lead-qualification-widget';
+import MobileNav from '@/components/layout/mobile-nav';
 
 export default function DashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('Week');
@@ -259,88 +262,88 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sidebar */}
-      <div className="fixed left-0 top-0 h-full w-16 bg-slate-800 flex flex-col items-center py-4 space-y-4">
-        <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-          <MessageSquare className="w-6 h-6 text-white" />
-        </div>
-        <div className="flex flex-col space-y-3 text-gray-400">
-          <div className="w-8 h-8 flex items-center justify-center hover:text-white cursor-pointer">
-            <BarChart3 className="w-5 h-5" />
-          </div>
-          <div className="w-8 h-8 flex items-center justify-center hover:text-white cursor-pointer">
-            <MessageSquare className="w-5 h-5" />
-          </div>
-          <div className="w-8 h-8 flex items-center justify-center hover:text-white cursor-pointer">
-            <Users className="w-5 h-5" />
-          </div>
-          <div className="w-8 h-8 flex items-center justify-center hover:text-white cursor-pointer">
-            <BarChart3 className="w-5 h-5" />
-          </div>
-          <div className="w-8 h-8 flex items-center justify-center hover:text-white cursor-pointer">
-            <FileText className="w-5 h-5" />
-          </div>
-        </div>
-      </div>
-
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
       {/* Main Content */}
-      <div className="ml-16 p-6">
+      <div className="p-4 lg:p-6 pb-20 lg:pb-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600 text-sm">Welcome back! Here's your WhatsApp activity overview.</p>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 space-y-4 lg:space-y-0">
+          <div className="space-y-1">
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                Dashboard
+              </h1>
+              <div className="hidden lg:block w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            </div>
+            <p className="text-gray-600 text-sm lg:text-base font-medium">
+              Welcome back! Here's your WhatsApp activity overview.
+            </p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input 
-                placeholder="Search..." 
-                className="pl-10 w-64"
+                placeholder="Search conversations, contacts..." 
+                className="pl-10 w-full sm:w-64 lg:w-80 bg-white/80 backdrop-blur-sm border-white/20 shadow-lg focus:shadow-xl transition-all duration-200"
               />
             </div>
-            <Button className="bg-green-600 hover:bg-green-700">
+            <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
               <Plus className="w-4 h-4 mr-2" />
-              New Message
+              <span className="hidden sm:inline">New Message</span>
+              <span className="sm:hidden">New</span>
             </Button>
           </div>
         </div>
 
         {/* Status Indicators */}
-        <div className="flex items-center space-x-6 mb-6">
-          {statusItems.map((item, index) => (
-            <div key={index} className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${item.color}`}></div>
-              <span className="text-sm text-gray-600">{item.name}</span>
-            </div>
-          ))}
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 lg:p-6 shadow-lg border border-white/20 mb-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+            System Status
+          </h3>
+          <div className="grid grid-cols-2 lg:flex lg:items-center lg:space-x-8 gap-4 lg:gap-0">
+            {statusItems.map((item, index) => (
+              <div key={index} className="flex items-center space-x-3 group">
+                <div className="relative">
+                  <div className={`w-3 h-3 rounded-full ${item.color} shadow-lg`}></div>
+                  <div className={`absolute inset-0 w-3 h-3 rounded-full ${item.color} animate-ping opacity-30`}></div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                  <span className="text-xs text-gray-500 capitalize">{item.status}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
           {metrics.map((metric, index) => (
-            <Card key={index}>
-              <CardContent className="p-6">
+            <Card key={index} className="group hover:shadow-2xl transition-all duration-300 transform hover:scale-105 bg-white/80 backdrop-blur-sm border-white/20 shadow-lg">
+              <CardContent className="p-4 lg:p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{metric.title}</p>
-                    <p className="text-2xl font-bold text-gray-900">{metric.value}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-600 mb-1 truncate">{metric.title}</p>
+                    <p className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{metric.value}</p>
                     {metric.change && (
-                      <div className="flex items-center mt-1">
-                        {metric.trend === 'up' && <ArrowUpRight className="w-4 h-4 text-green-500" />}
-                        {metric.trend === 'down' && <ArrowDownRight className="w-4 h-4 text-red-500" />}
-                        <span className={`text-sm ${
+                      <div className="flex items-center">
+                        {metric.trend === 'up' && <ArrowUpRight className="w-4 h-4 text-green-500 mr-1" />}
+                        {metric.trend === 'down' && <ArrowDownRight className="w-4 h-4 text-red-500 mr-1" />}
+                        <span className={`text-xs font-medium ${
                           metric.trend === 'up' ? 'text-green-600' : 
                           metric.trend === 'down' ? 'text-red-600' : 'text-gray-600'
                         }`}>
-                          {metric.change} {metric.period}
+                          {metric.change}
                         </span>
+                        {metric.period && (
+                          <span className="text-xs text-gray-500 ml-1">{metric.period}</span>
+                        )}
                       </div>
                     )}
                   </div>
-                  <div className={`p-3 rounded-lg ${metric.bgColor}`}>
-                    <metric.icon className={`w-6 h-6 ${metric.color}`} />
+                  <div className={`relative p-3 lg:p-4 rounded-xl ${metric.bgColor} group-hover:scale-110 transition-transform duration-200`}>
+                    <metric.icon className={`w-6 h-6 lg:w-7 lg:h-7 ${metric.color}`} />
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                   </div>
                 </div>
               </CardContent>
@@ -348,20 +351,28 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             {/* Conversation Trends Chart */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Conversation Trends</CardTitle>
-                <div className="flex space-x-2">
+            <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0 pb-4">
+                <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
+                  <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
+                  Conversation Trends
+                </CardTitle>
+                <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
                   {['Day', 'Week', 'Month'].map((period) => (
                     <Button
                       key={period}
-                      variant={selectedPeriod === period ? "default" : "outline"}
+                      variant={selectedPeriod === period ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setSelectedPeriod(period)}
+                      className={`transition-all duration-200 ${
+                        selectedPeriod === period 
+                          ? 'bg-white shadow-md text-gray-900' 
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
                     >
                       {period}
                     </Button>
@@ -369,37 +380,56 @@ export default function DashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  <div className="text-center">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                    <p>Chart visualization would go here</p>
-                    <p className="text-sm">Showing {(stats as any).total_conversations || 0} total conversations</p>
+                <div className="h-64 lg:h-80 flex items-center justify-center text-gray-500 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-200">
+                  <div className="text-center space-y-4">
+                    <div className="relative">
+                      <BarChart3 className="w-16 h-16 mx-auto text-gray-300" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-xl"></div>
+                    </div>
+                    <div>
+                      <p className="text-lg font-semibold text-gray-700">Chart visualization would go here</p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Showing <span className="font-semibold text-blue-600">{(stats as any).total_conversations || 0}</span> total conversations
+                      </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Recent Activity */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
+            <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
+                  <Clock className="w-5 h-5 mr-2 text-green-600" />
+                  Recent Activity
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-80 overflow-y-auto scrollbar-thin">
                   {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-center space-x-3">
-                      <div className={`p-2 rounded-full bg-gray-100`}>
+                    <div key={index} className="flex items-center space-x-4 p-3 rounded-xl hover:bg-gray-50/80 transition-all duration-200 group cursor-pointer">
+                      <div className={`p-2.5 rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 group-hover:scale-110 transition-transform duration-200 shadow-sm`}>
                         <activity.icon className={`w-4 h-4 ${activity.color}`} />
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                        <p className="text-xs text-gray-500">{activity.time}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                          {activity.title}
+                        </p>
+                        <p className="text-xs text-gray-500 font-medium">{activity.time}</p>
+                      </div>
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ArrowUpRight className="w-4 h-4 text-gray-400" />
                       </div>
                     </div>
                   )) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <Clock className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                      <p>No recent activity</p>
+                    <div className="text-center py-12 text-gray-500">
+                      <div className="relative mb-4">
+                        <Clock className="w-12 h-12 mx-auto text-gray-300" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200/20 to-gray-300/20 rounded-full blur-xl"></div>
+                      </div>
+                      <p className="text-lg font-semibold text-gray-700">No recent activity</p>
+                      <p className="text-sm text-gray-500 mt-1">Activity will appear here as you use the system</p>
                     </div>
                   )}
                 </div>
@@ -407,54 +437,93 @@ export default function DashboardPage() {
             </Card>
 
             {/* Active Campaigns */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Active Campaigns</CardTitle>
-                <Button variant="outline" size="sm">
+            <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0 pb-4">
+                <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
+                  <BarChart3 className="w-5 h-5 mr-2 text-purple-600" />
+                  Active Campaigns
+                </CardTitle>
+                <Button variant="outline" size="sm" className="bg-white/60 backdrop-blur-sm border-white/20 hover:bg-white/80 transition-all duration-200">
                   <Eye className="w-4 h-4 mr-2" />
                   View All
                 </Button>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 text-sm font-medium text-gray-600">Campaign</th>
-                        <th className="text-left py-2 text-sm font-medium text-gray-600">Status</th>
-                        <th className="text-left py-2 text-sm font-medium text-gray-600">Recipients</th>
-                        <th className="text-left py-2 text-sm font-medium text-gray-600">Delivery</th>
-                        <th className="text-left py-2 text-sm font-medium text-gray-600">Response</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activeCampaigns.length > 0 ? activeCampaigns.map((campaign: any, index: number) => (
-                        <tr key={index} className="border-b">
-                          <td className="py-3">
-                            <div>
-                              <p className="font-medium text-gray-900">{campaign.name}</p>
-                              <p className="text-sm text-gray-500">{campaign.created}</p>
-                            </div>
-                          </td>
-                          <td className="py-3">
-                            <Badge className={campaign.statusColor}>
+                  {activeCampaigns.length > 0 ? (
+                    <div className="hidden lg:block">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left py-3 text-sm font-semibold text-gray-700">Campaign</th>
+                            <th className="text-left py-3 text-sm font-semibold text-gray-700">Status</th>
+                            <th className="text-left py-3 text-sm font-semibold text-gray-700">Recipients</th>
+                            <th className="text-left py-3 text-sm font-semibold text-gray-700">Delivery</th>
+                            <th className="text-left py-3 text-sm font-semibold text-gray-700">Response</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activeCampaigns.map((campaign: any, index: number) => (
+                            <tr key={index} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors group">
+                              <td className="py-4">
+                                <div>
+                                  <p className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{campaign.name}</p>
+                                  <p className="text-sm text-gray-500 font-medium">{campaign.created}</p>
+                                </div>
+                              </td>
+                              <td className="py-4">
+                                <Badge className={`${campaign.statusColor} font-medium shadow-sm`}>
+                                  {campaign.status}
+                                </Badge>
+                              </td>
+                              <td className="py-4 text-gray-900 font-medium">{campaign.recipients}</td>
+                              <td className="py-4 text-gray-900 font-medium">{campaign.delivered}</td>
+                              <td className="py-4 text-gray-900 font-medium">{campaign.responseRate}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <div className="relative mb-4">
+                        <BarChart3 className="w-12 h-12 mx-auto text-gray-300" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-purple-200/20 to-pink-200/20 rounded-full blur-xl"></div>
+                      </div>
+                      <p className="text-lg font-semibold text-gray-700">No campaigns found</p>
+                      <p className="text-sm text-gray-500 mt-1">Create your first campaign to get started</p>
+                    </div>
+                  )}
+                  
+                  {/* Mobile view for campaigns */}
+                  {activeCampaigns.length > 0 && (
+                    <div className="lg:hidden space-y-4">
+                      {activeCampaigns.map((campaign: any, index: number) => (
+                        <div key={index} className="bg-gray-50/80 rounded-xl p-4 space-y-3 hover:bg-gray-100/80 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-gray-900">{campaign.name}</h4>
+                            <Badge className={`${campaign.statusColor} font-medium shadow-sm`}>
                               {campaign.status}
                             </Badge>
-                          </td>
-                          <td className="py-3 text-gray-900">{campaign.recipients}</td>
-                          <td className="py-3 text-gray-900">{campaign.delivered}</td>
-                          <td className="py-3 text-gray-900">{campaign.responseRate}</td>
-                        </tr>
-                      )) : (
-                        <tr>
-                          <td colSpan={5} className="py-8 text-center text-gray-500">
-                            <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                            <p>No campaigns found</p>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-gray-500 font-medium">Recipients</p>
+                              <p className="text-gray-900 font-semibold">{campaign.recipients}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 font-medium">Delivery</p>
+                              <p className="text-gray-900 font-semibold">{campaign.delivered}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-500 font-medium">{campaign.created}</span>
+                            <span className="text-gray-900 font-semibold">Response: {campaign.responseRate}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -463,40 +532,50 @@ export default function DashboardPage() {
           {/* Right Column */}
           <div className="space-y-6">
             {/* Recent Conversations */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Conversations</CardTitle>
+            <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
+                  <MessageSquare className="w-5 h-5 mr-2 text-blue-600" />
+                  Recent Conversations
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-3 max-h-96 overflow-y-auto scrollbar-thin">
                   {recentConversations.length > 0 ? recentConversations.map((conversation, index) => (
-                    <div key={index} className="flex items-center space-x-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-blue-100 text-blue-600">
+                    <div key={index} className="flex items-center space-x-4 p-3 rounded-xl hover:bg-gray-50/80 transition-all duration-200 group cursor-pointer border border-transparent hover:border-blue-200/50">
+                      <Avatar className="h-12 w-12 shadow-md group-hover:scale-110 transition-transform duration-200">
+                        <AvatarFallback className="bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 font-semibold">
                           {conversation.avatar}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium text-gray-900 truncate">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
                             {conversation.name}
                           </p>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs text-gray-500">{conversation.time}</span>
+                          <div className="flex items-center space-x-2 flex-shrink-0">
+                            <span className="text-xs text-gray-500 font-medium">{conversation.time}</span>
                             {conversation.unread > 0 && (
-                              <div className="bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                              <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-md animate-pulse">
                                 {conversation.unread}
                               </div>
                             )}
                           </div>
                         </div>
-                        <p className="text-sm text-gray-500 truncate">{conversation.message}</p>
+                        <p className="text-sm text-gray-600 truncate font-medium">{conversation.message}</p>
+                      </div>
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ArrowUpRight className="w-4 h-4 text-gray-400" />
                       </div>
                     </div>
                   )) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <MessageSquare className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                      <p>No conversations yet</p>
+                    <div className="text-center py-12 text-gray-500">
+                      <div className="relative mb-4">
+                        <MessageSquare className="w-12 h-12 mx-auto text-gray-300" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-200/20 to-indigo-200/20 rounded-full blur-xl"></div>
+                      </div>
+                      <p className="text-lg font-semibold text-gray-700">No conversations yet</p>
+                      <p className="text-sm text-gray-500 mt-1">Start a conversation to see it here</p>
                     </div>
                   )}
                 </div>
@@ -504,9 +583,12 @@ export default function DashboardPage() {
             </Card>
 
             {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
+            <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
+                  <Zap className="w-5 h-5 mr-2 text-yellow-600" />
+                  Quick Actions
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-3">
@@ -514,12 +596,13 @@ export default function DashboardPage() {
                     <Button
                       key={index}
                       variant="outline"
-                      className="h-20 flex flex-col items-center justify-center space-y-2"
+                      className="h-24 flex flex-col items-center justify-center space-y-3 bg-white/60 backdrop-blur-sm border-white/20 hover:bg-white/80 hover:shadow-lg transition-all duration-200 transform hover:scale-105 group"
                     >
-                      <div className={`p-2 rounded-lg ${action.color}`}>
+                      <div className={`relative p-3 rounded-xl ${action.color} shadow-lg group-hover:scale-110 transition-transform duration-200`}>
                         <action.icon className="w-5 h-5 text-white" />
+                        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                       </div>
-                      <span className="text-sm">{action.title}</span>
+                      <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900 transition-colors">{action.title}</span>
                     </Button>
                   ))}
                 </div>
@@ -527,50 +610,57 @@ export default function DashboardPage() {
             </Card>
 
             {/* Upcoming Tasks */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Upcoming Tasks</CardTitle>
-                <Button variant="outline" size="sm">
+            <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0 pb-4">
+                <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
+                  <Calendar className="w-5 h-5 mr-2 text-indigo-600" />
+                  Upcoming Tasks
+                </CardTitle>
+                <Button variant="outline" size="sm" className="bg-white/60 backdrop-blur-sm border-white/20 hover:bg-white/80 transition-all duration-200">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Task
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-80 overflow-y-auto scrollbar-thin">
                   {upcomingTasks.length > 0 ? upcomingTasks.map((task, index) => (
-                    <div key={index} className="flex items-center space-x-3">
+                    <div key={index} className="flex items-center space-x-4 p-3 rounded-xl hover:bg-gray-50/80 transition-all duration-200 group cursor-pointer border border-transparent hover:border-indigo-200/50">
                       <div className="flex-shrink-0">
                         {task.completed ? (
-                          <CheckCircle className="w-5 h-5 text-green-500" />
+                          <CheckCircle className="w-6 h-6 text-green-500 group-hover:scale-110 transition-transform duration-200" />
                         ) : (
-                          <div className="w-5 h-5 border-2 border-gray-300 rounded"></div>
+                          <div className="w-6 h-6 border-2 border-gray-300 rounded-md group-hover:border-indigo-400 transition-colors duration-200"></div>
                         )}
                       </div>
-                      <div className="flex-1">
-                        <p className={`text-sm ${task.completed ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold ${task.completed ? 'line-through text-gray-500' : 'text-gray-900 group-hover:text-indigo-600'} transition-colors`}>
                           {task.title}
                         </p>
                         {task.dueDate && (
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-gray-500 font-medium mt-1">
                             Due: {formatDate(task.dueDate)}
                           </p>
                         )}
                       </div>
                       <Badge 
                         variant="outline" 
-                        className={
-                          task.priority === 'high' ? 'border-red-200 text-red-700' :
-                          task.priority === 'medium' ? 'border-yellow-200 text-yellow-700' :
-                          'border-gray-200 text-gray-700'
-                        }
+                        className={`font-medium shadow-sm ${
+                          task.priority === 'high' ? 'border-red-200 text-red-700 bg-red-50' :
+                          task.priority === 'medium' ? 'border-yellow-200 text-yellow-700 bg-yellow-50' :
+                          'border-gray-200 text-gray-700 bg-gray-50'
+                        }`}
                       >
                         {task.priority}
                       </Badge>
                     </div>
                   )) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <Calendar className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                      <p>No upcoming tasks</p>
+                    <div className="text-center py-12 text-gray-500">
+                      <div className="relative mb-4">
+                        <Calendar className="w-12 h-12 mx-auto text-gray-300" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-200/20 to-purple-200/20 rounded-full blur-xl"></div>
+                      </div>
+                      <p className="text-lg font-semibold text-gray-700">No upcoming tasks</p>
+                      <p className="text-sm text-gray-500 mt-1">Add tasks to stay organized</p>
                     </div>
                   )}
                 </div>
@@ -580,11 +670,22 @@ export default function DashboardPage() {
         </div>
 
         {/* Lead Qualification Analytics */}
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">AI Lead Qualification Analytics</h2>
-          <LeadQualificationWidget />
+        <div className="mt-12">
+          <div className="mb-8">
+            <h2 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2 flex items-center">
+              <Sparkles className="w-6 h-6 lg:w-7 lg:h-7 mr-3 text-purple-600" />
+              AI Lead Qualification Analytics
+            </h2>
+            <p className="text-gray-600 font-medium">Advanced insights powered by artificial intelligence</p>
+          </div>
+          <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-1 shadow-lg border border-white/20">
+            <LeadQualificationWidget />
+          </div>
         </div>
       </div>
+      
+      {/* Mobile Navigation */}
+      <MobileNav />
     </div>
   );
 } 

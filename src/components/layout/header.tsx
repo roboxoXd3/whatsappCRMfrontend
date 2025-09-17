@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAppStore } from '@/lib/stores/app';
 import { 
-  Menu, 
   Search, 
   Bell, 
   Settings, 
@@ -15,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export function Header() {
-  const { toggleSidebar, notifications, unreadCount } = useAppStore();
+  const { unreadCount } = useAppStore();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -30,17 +29,8 @@ export function Header() {
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3 lg:px-6">
       <div className="flex items-center justify-between">
-        {/* Left: Mobile menu toggle + Search */}
+        {/* Left: Search */}
         <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleSidebar}
-            className="lg:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-
           {/* Search */}
           <div className="relative">
             {searchOpen ? (
@@ -73,7 +63,6 @@ export function Header() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setSearchOpen(true)}
-                className="hidden sm:flex"
               >
                 <Search className="h-5 w-5" />
               </Button>
@@ -83,15 +72,6 @@ export function Header() {
 
         {/* Right: Actions */}
         <div className="flex items-center space-x-2">
-          {/* Search button for mobile */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSearchOpen(true)}
-            className="sm:hidden"
-          >
-            <Search className="h-5 w-5" />
-          </Button>
 
           {/* Notifications */}
           <div className="relative">
@@ -120,24 +100,6 @@ export function Header() {
         </div>
       </div>
 
-      {/* Mobile search overlay */}
-      {searchOpen && (
-        <div className="sm:hidden mt-3">
-          <form onSubmit={handleSearch}>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Search conversations, contacts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-full"
-                autoFocus
-              />
-            </div>
-          </form>
-        </div>
-      )}
     </header>
   );
 } 

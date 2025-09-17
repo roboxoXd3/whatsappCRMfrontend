@@ -35,31 +35,70 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        "fixed inset-y-0 left-0 z-50 bg-white border-r border-gray-200 transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
+        sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full lg:translate-x-0 lg:w-16"
       )}>
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <div className="flex items-center space-x-2">
-              <MessageSquare className="h-8 w-8 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900">WhatsApp CRM</span>
+          <div className={cn(
+            "flex items-center p-4 border-b border-gray-200 transition-all duration-300",
+            sidebarOpen ? "justify-between" : "lg:justify-center lg:flex-col lg:space-y-2"
+          )}>
+            {/* Expanded Header */}
+            <div className={cn(
+              "flex items-center space-x-3 transition-all duration-300",
+              sidebarOpen ? "opacity-100" : "lg:opacity-0 lg:w-0 lg:overflow-hidden lg:h-0"
+            )}>
+              <MessageSquare className="h-8 w-8 text-blue-600 flex-shrink-0" />
+              <span className="text-xl font-bold text-gray-900 whitespace-nowrap">WhatsApp CRM</span>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="lg:hidden"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+            
+            {/* Collapsed Logo for Desktop */}
+            <div className={cn(
+              "items-center justify-center transition-all duration-300 hidden lg:flex group relative",
+              sidebarOpen ? "lg:opacity-0 lg:w-0 lg:overflow-hidden lg:h-0" : "lg:opacity-100"
+            )}>
+              <MessageSquare className="h-8 w-8 text-blue-600" />
+              {/* Tooltip for collapsed logo */}
+              <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                WhatsApp CRM
+              </div>
+            </div>
+            
+            {/* Toggle Button */}
+            <div className="relative group">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleSidebar}
+                className="w-8 h-8 hover:bg-gray-100 flex-shrink-0"
+              >
+                {sidebarOpen ? (
+                  <ChevronLeft className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </Button>
+              {/* Tooltip for toggle button when collapsed */}
+              {!sidebarOpen && (
+                <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 hidden lg:block">
+                  Expand sidebar
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-8 overflow-y-auto">
+          <nav className={cn(
+            "flex-1 py-6 space-y-8 overflow-y-auto transition-all duration-300",
+            sidebarOpen ? "px-4" : "lg:px-2"
+          )}>
             {/* Main Navigation */}
             <div>
-              <h3 className="px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              <h3 className={cn(
+                "px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 transition-all duration-300",
+                sidebarOpen ? "opacity-100" : "lg:opacity-0 lg:h-0 lg:mb-0 lg:overflow-hidden"
+              )}>
                 Main
               </h3>
               <ul className="space-y-1">
@@ -68,24 +107,31 @@ export function Sidebar() {
                   const Icon = item.icon;
 
                   return (
-                    <li key={item.name}>
+                    <li key={item.name} className="relative group">
                       <Link
                         href={item.href}
                         className={cn(
-                          "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                          "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
                           isActive
                             ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600"
-                            : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                            : "text-gray-700 hover:text-gray-900 hover:bg-gray-50",
+                          !sidebarOpen && "lg:justify-center lg:px-2"
                         )}
                       >
                         <Icon className={cn(
-                          "flex-shrink-0 -ml-1 mr-3 h-5 w-5",
+                          "flex-shrink-0 h-5 w-5",
+                          sidebarOpen ? "-ml-1 mr-3" : "lg:mr-0",
                           isActive 
                             ? "text-blue-600" 
                             : "text-gray-400 group-hover:text-gray-500"
                         )} />
-                        <span className="truncate">{item.name}</span>
-                        {item.badge && (
+                        <span className={cn(
+                          "truncate transition-all duration-300",
+                          sidebarOpen ? "opacity-100" : "lg:opacity-0 lg:w-0 lg:overflow-hidden"
+                        )}>
+                          {item.name}
+                        </span>
+                        {item.badge && sidebarOpen && (
                           <Badge 
                             variant="secondary" 
                             className="ml-auto"
@@ -94,10 +140,17 @@ export function Sidebar() {
                             {item.badge}
                           </Badge>
                         )}
-                        {item.children && (
+                        {item.children && sidebarOpen && (
                           <ChevronDown className="ml-auto h-4 w-4" />
                         )}
                       </Link>
+                      
+                      {/* Tooltip for collapsed state */}
+                      {!sidebarOpen && (
+                        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 hidden lg:block">
+                          {item.name}
+                        </div>
+                      )}
 
                       {/* Sub-navigation */}
                       {item.children && isActive && (
@@ -133,7 +186,10 @@ export function Sidebar() {
 
             {/* Secondary Navigation */}
             <div>
-              <h3 className="px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              <h3 className={cn(
+                "px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 transition-all duration-300",
+                sidebarOpen ? "opacity-100" : "lg:opacity-0 lg:h-0 lg:mb-0 lg:overflow-hidden"
+              )}>
                 Settings
               </h3>
               <ul className="space-y-1">
@@ -142,24 +198,38 @@ export function Sidebar() {
                   const Icon = item.icon;
 
                   return (
-                    <li key={item.name}>
+                    <li key={item.name} className="relative group">
                       <Link
                         href={item.href}
                         className={cn(
-                          "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                          "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
                           isActive
                             ? "bg-blue-50 text-blue-700"
-                            : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                            : "text-gray-700 hover:text-gray-900 hover:bg-gray-50",
+                          !sidebarOpen && "lg:justify-center lg:px-2"
                         )}
                       >
                         <Icon className={cn(
-                          "flex-shrink-0 -ml-1 mr-3 h-5 w-5",
+                          "flex-shrink-0 h-5 w-5",
+                          sidebarOpen ? "-ml-1 mr-3" : "lg:mr-0",
                           isActive 
                             ? "text-blue-600" 
                             : "text-gray-400 group-hover:text-gray-500"
                         )} />
-                        <span className="truncate">{item.name}</span>
+                        <span className={cn(
+                          "truncate transition-all duration-300",
+                          sidebarOpen ? "opacity-100" : "lg:opacity-0 lg:w-0 lg:overflow-hidden"
+                        )}>
+                          {item.name}
+                        </span>
                       </Link>
+                      
+                      {/* Tooltip for collapsed state */}
+                      {!sidebarOpen && (
+                        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 hidden lg:block">
+                          {item.name}
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -169,13 +239,26 @@ export function Sidebar() {
 
           {/* User Profile Section */}
           <div className="p-4 border-t border-gray-200">
-            <div className="flex items-center space-x-3">
+            <div className={cn(
+              "flex items-center relative group",
+              sidebarOpen ? "space-x-3" : "lg:justify-center"
+            )}>
               <div className="flex-shrink-0">
                 <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
                   <User className="h-6 w-6 text-white" />
                 </div>
               </div>
-              <div className="flex-1 min-w-0">
+              
+              {/* Tooltip for collapsed state */}
+              {!sidebarOpen && (
+                <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 hidden lg:block">
+                  Admin User
+                </div>
+              )}
+              <div className={cn(
+                "flex-1 min-w-0 transition-all duration-300",
+                sidebarOpen ? "opacity-100" : "lg:opacity-0 lg:w-0 lg:overflow-hidden"
+              )}>
                 <p className="text-sm font-medium text-gray-900 truncate">
                   {user?.name || 'Admin User'}
                 </p>
@@ -187,7 +270,10 @@ export function Sidebar() {
                 variant="ghost"
                 size="icon"
                 onClick={logout}
-                className="flex-shrink-0"
+                className={cn(
+                  "flex-shrink-0 transition-all duration-300",
+                  sidebarOpen ? "opacity-100" : "lg:opacity-0 lg:w-0 lg:overflow-hidden"
+                )}
                 title="Logout"
               >
                 <LogOut className="h-4 w-4" />
