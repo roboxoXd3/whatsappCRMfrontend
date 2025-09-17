@@ -69,6 +69,7 @@ export function ConversationDetail({
     refetch 
   } = useConversationDetail(conversation.id);
 
+
   // Message sending mutation
   const sendMessageMutation = useSendMessage();
 
@@ -384,10 +385,7 @@ export function ConversationDetail({
                     message={{
                       ...msg,
                       id: msg.id || `${msg.timestamp}-${index}`,
-                      status: msg.status || 'sent',
-                      message_id: undefined,
-                      timestamps: undefined,
-                      metadata: undefined
+                      status: msg.status || 'sent'
                     }}
                     className="mb-4"
                     showDetailedStatus={false}

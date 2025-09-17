@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthInitializer } from "@/components/providers/auth-initializer";
+import { AppLayout } from "@/components/layout/app-layout";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -69,7 +70,9 @@ export default function RootLayout({
       >
         <QueryProvider>
           <AuthInitializer>
-            {children}
+            <AppLayout>
+              {children}
+            </AppLayout>
           </AuthInitializer>
           <Toaster />
         </QueryProvider>

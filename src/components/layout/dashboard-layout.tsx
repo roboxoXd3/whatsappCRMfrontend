@@ -3,6 +3,7 @@
 import React from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
+import MobileNav from './mobile-nav';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -20,9 +21,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <Header />
         
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50">
+        <main className="flex-1 overflow-y-auto bg-gray-50 pb-16 lg:pb-0">
           {children}
         </main>
+        
+        {/* Mobile Navigation - Only visible on mobile */}
+        <div className="lg:hidden">
+          <MobileNav />
+        </div>
       </div>
     </div>
   );

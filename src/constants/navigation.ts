@@ -2,14 +2,11 @@ import {
   LayoutDashboard,
   MessageSquare,
   Users,
-  Megaphone,
-  BarChart3,
   Settings,
   Phone,
   UserPlus,
   Calendar,
   Target,
-  TrendingUp,
   Bell,
   Key,
   Send,
@@ -82,12 +79,6 @@ export const mainNavigation: NavigationItem[] = [
     ],
   },
   {
-    name: 'Campaigns',
-    href: '/campaigns',
-    icon: Megaphone,
-    description: 'Bulk messaging and automation',
-  },
-  {
     name: 'Bulk Send',
     href: '/bulk-send',
     icon: Send,
@@ -104,12 +95,6 @@ export const mainNavigation: NavigationItem[] = [
     href: '/scheduled-messages',
     icon: Calendar,
     description: 'View and manage scheduled messages',
-  },
-  {
-    name: 'Analytics',
-    href: '/analytics',
-    icon: BarChart3,
-    description: 'Reports and insights',
   },
 ];
 
@@ -156,18 +141,6 @@ export const quickActions: NavigationItem[] = [
     icon: UserPlus,
     description: 'Create new contact',
   },
-  {
-    name: 'New Campaign',
-    href: '/campaigns/new',
-    icon: Megaphone,
-    description: 'Launch bulk messaging campaign',
-  },
-  {
-    name: 'View Reports',
-    href: '/analytics',
-    icon: TrendingUp,
-    description: 'Check performance metrics',
-  },
 ];
 
 // Breadcrumb configuration
@@ -178,11 +151,9 @@ export const breadcrumbLabels: Record<string, string> = {
   contacts: 'Contacts',
   deals: 'Deals',
   tasks: 'Tasks',
-  campaigns: 'Campaigns',
   'bulk-send': 'Bulk Send',
   'group-creation': 'Group Creation',
   'scheduled-messages': 'Scheduled Messages',
-  analytics: 'Analytics',
   settings: 'Settings',
   'api-keys': 'API Keys',
   notifications: 'Notifications',

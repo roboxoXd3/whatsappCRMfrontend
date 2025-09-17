@@ -33,7 +33,6 @@ import { useConversations, type Conversation } from '@/lib/hooks/use-conversatio
 import { useCampaigns, type Campaign } from '@/lib/hooks/use-campaigns';
 import { useTasks } from '@/hooks/useCRM';
 import LeadQualificationWidget from '@/components/dashboard/lead-qualification-widget';
-import MobileNav from '@/components/layout/mobile-nav';
 
 export default function DashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('Week');
@@ -683,9 +682,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-      
-      {/* Mobile Navigation */}
-      <MobileNav />
     </div>
   );
 } 

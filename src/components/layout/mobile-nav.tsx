@@ -4,12 +4,15 @@ import React from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  BarChart3, 
   MessageSquare, 
   Users, 
   Calendar,
   Settings,
-  Home
+  Home,
+  UserCog,
+  BookOpen,
+  Send,
+  UsersRound
 } from 'lucide-react';
 
 const MobileNav = () => {
@@ -26,45 +29,69 @@ const MobileNav = () => {
       name: 'Messages',
       href: '/conversations',
       icon: MessageSquare,
-      active: pathname === '/conversations'
+      active: pathname === '/conversations' || pathname.startsWith('/conversations/')
     },
     {
-      name: 'Contacts',
+      name: 'CRM',
       href: '/crm',
       icon: Users,
-      active: pathname === '/crm'
+      active: pathname === '/crm' || pathname.startsWith('/crm/')
     },
     {
-      name: 'Analytics',
-      href: '/analytics',
-      icon: BarChart3,
-      active: pathname === '/analytics'
+      name: 'Handover',
+      href: '/handover',
+      icon: UserCog,
+      active: pathname === '/handover'
+    },
+    {
+      name: 'Knowledge',
+      href: '/knowledge-base',
+      icon: BookOpen,
+      active: pathname === '/knowledge-base' || pathname.startsWith('/knowledge-base/')
+    },
+    {
+      name: 'Bulk Send',
+      href: '/bulk-send',
+      icon: Send,
+      active: pathname === '/bulk-send'
+    },
+    {
+      name: 'Groups',
+      href: '/group-creation',
+      icon: UsersRound,
+      active: pathname === '/group-creation'
+    },
+    {
+      name: 'Scheduled',
+      href: '/scheduled-messages',
+      icon: Calendar,
+      active: pathname === '/scheduled-messages'
     },
     {
       name: 'Settings',
       href: '/settings',
       icon: Settings,
-      active: pathname === '/settings'
+      active: pathname === '/settings' || pathname.startsWith('/settings/')
     }
   ];
 
   return (
     <nav className="mobile-nav safe-area-bottom">
-      <div className="flex justify-around items-center">
+      <div className="flex items-center overflow-x-auto scrollbar-hide px-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
             <Link
               key={item.name}
               href={item.href}
-              className={`mobile-nav-item touch-target mobile-touch ${
+              className={`mobile-nav-item touch-target mobile-touch flex-shrink-0 ${
                 item.active 
                   ? 'text-blue-600 bg-blue-50' 
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
-              <Icon className="w-5 h-5 mb-1" />
-              <span className="text-xs font-medium">{item.name}</span>
+              <Icon className="w-4 h-4 mb-1" />
+              <span className="text-xs font-medium whitespace-nowrap">{item.name}</span>
             </Link>
           );
         })}

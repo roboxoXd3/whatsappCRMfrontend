@@ -494,14 +494,23 @@ img {
   }
   
   .mobile-nav {
-    @apply fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 p-2 lg:hidden;
+    @apply fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 py-2 lg:hidden;
   }
   
   .mobile-nav-item {
-    @apply flex flex-col items-center justify-center p-2 rounded-lg transition-colors;
+    @apply flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-colors min-w-[60px];
   }
 
   /* Scrollbar styling */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: rgb(203 213 225) transparent;

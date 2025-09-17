@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useToast } from '@/hooks/use-toast';
-import { ProtectedRoute } from '@/components/auth/protected-route';
 import { QRCodeScanner } from '@/components/whatsapp/qr-code-scanner';
 import { WhatsAppSessionAPI, WhatsAppSession, QRCodeData, SessionStatus, HealthCheckResult, LiveSessionStatus, ExistingSessionCheck, WebhookConfig, UpdateWebhookRequest, WebhookEventInfo, WebhookEventType, AVAILABLE_WEBHOOK_EVENTS } from '@/lib/api/whatsapp-session';
 
@@ -617,8 +616,7 @@ export default function WhatsAppConnectPage() {
   };
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
         <div className="container mx-auto px-4 py-6 sm:py-8 max-w-6xl">
           {/* Header Section */}
           <div className="text-center mb-8 sm:mb-12">
@@ -1389,6 +1387,5 @@ export default function WhatsAppConnectPage() {
           )}
         </div>
       </div>
-    </ProtectedRoute>
   );
 }
