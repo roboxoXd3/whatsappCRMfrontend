@@ -45,48 +45,48 @@ export function MessageBubble({
 
   return (
     <div className={cn(
-      "flex gap-3 max-w-4xl group",
+      "flex gap-2 sm:gap-3 w-full group px-1 sm:px-0",
       (isUser || isHuman) ? "flex-row-reverse" : "flex-row",
       className
     )}>
-      {/* Avatar */}
+      {/* Avatar - Smaller on mobile */}
       <div className={cn(
-        "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium",
+        "flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white text-sm font-medium",
         isUser ? "bg-blue-500" : isHuman ? "bg-purple-500" : "bg-green-500"
       )}>
         {isUser ? (
-          <User className="h-4 w-4" />
+          <User className="h-3 w-3 sm:h-4 sm:w-4" />
         ) : isHuman ? (
-          <Zap className="h-4 w-4" />
+          <Zap className="h-3 w-3 sm:h-4 sm:w-4" />
         ) : (
-          <Bot className="h-4 w-4" />
+          <Bot className="h-3 w-3 sm:h-4 sm:w-4" />
         )}
       </div>
 
       {/* Message Content */}
       <div className={cn(
-        "flex-1 min-w-0",
+        "flex-1 min-w-0 max-w-[calc(100%-2.5rem)]", // Ensure content doesn't overflow
         (isUser || isHuman) ? "items-end" : "items-start"
       )}>
-        {/* Header with sender info and timestamp */}
+        {/* Header with sender info and timestamp - More compact on mobile */}
         <div className={cn(
-          "flex items-center gap-2 mb-1",
+          "flex items-center gap-1 sm:gap-2 mb-1 flex-wrap",
           (isUser || isHuman) ? "justify-end" : "justify-start"
         )}>
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-xs sm:text-sm font-medium text-gray-900 truncate">
             {isUser ? 'Customer' : isHuman ? 'Human Agent' : 'AI Assistant'}
           </span>
           <span 
-            className="text-xs text-gray-500 cursor-help"
+            className="text-xs text-gray-500 cursor-help flex-shrink-0"
             title={getAbsoluteTime(message.timestamp)}
           >
             {formatTime(message.timestamp)}
           </span>
           
-          {/* Context indicators */}
+          {/* Context indicators - Hide some on very small screens */}
           {message.metadata?.customer_context_used && (
             <span 
-              className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded"
+              className="hidden sm:inline-block text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded"
               title="Response used customer context"
             >
               Personalized
@@ -95,7 +95,7 @@ export function MessageBubble({
           
           {message.metadata?.response_time_ms && (
             <span 
-              className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded"
+              className="hidden sm:inline-block text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded"
               title={`Response time: ${message.metadata.response_time_ms}ms`}
             >
               {message.metadata.response_time_ms < 1000 ? 'Fast' : 'Normal'}
@@ -103,9 +103,13 @@ export function MessageBubble({
           )}
         </div>
         
-        {/* Message bubble */}
+        {/* Message bubble - Improved mobile responsiveness */}
         <div className={cn(
-          "rounded-lg px-4 py-3 max-w-2xl relative",
+          "rounded-lg px-3 py-2 sm:px-4 sm:py-3 relative",
+          "max-w-[95%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-2xl", // Progressive width constraints
+          "min-w-[80px] sm:min-w-[100px]", // Responsive minimum width
+          "break-words overflow-wrap-anywhere", // Better word breaking
+          "shadow-sm", // Subtle shadow for better definition
           isUser 
             ? "bg-blue-500 text-white ml-auto" 
             : isHuman
@@ -114,7 +118,7 @@ export function MessageBubble({
             ? "bg-amber-50 text-amber-800 border border-amber-200 mr-auto"
             : "bg-gray-100 text-gray-900 mr-auto"
         )}>
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+          <p className="text-sm sm:text-base lg:text-sm leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
             {message.content}
           </p>
           
@@ -130,11 +134,11 @@ export function MessageBubble({
           )}
         </div>
         
-        {/* External status indicator for user messages */}
+        {/* External status indicator for user messages - More compact on mobile */}
         {!isUser && showDetailedStatus && (
           <div className={cn(
             "flex mt-1 text-xs",
-            (isUser || isHuman) ? "justify-end mr-2" : "justify-start ml-2"
+            (isUser || isHuman) ? "justify-end mr-1 sm:mr-2" : "justify-start ml-1 sm:ml-2"
           )}>
             <DetailedMessageStatus 
               status={message.status}
@@ -143,9 +147,9 @@ export function MessageBubble({
           </div>
         )}
         
-        {/* Message ID for debugging (only in development) */}
+        {/* Message ID for debugging (only in development) - Hide on very small screens */}
         {process.env.NODE_ENV === 'development' && message.message_id && (
-          <div className="text-xs text-gray-400 mt-1 font-mono">
+          <div className="hidden sm:block text-xs text-gray-400 mt-1 font-mono truncate">
             ID: {message.message_id}
           </div>
         )}

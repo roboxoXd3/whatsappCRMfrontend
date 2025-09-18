@@ -74,9 +74,15 @@ function ConversationsContent() {
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">
+      {/* Mobile: Full screen conversation list or chat */}
+      {/* Desktop: Side-by-side layout */}
+      
       {/* Left Panel - Conversations List */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        {/* WhatsApp-style Header - Exact match */}
+      <div className={`
+        ${selectedConversation ? 'hidden lg:flex' : 'flex'} 
+        w-full lg:w-80 bg-white border-r border-gray-200 flex-col
+      `}>
+        {/* WhatsApp-style Header */}
         <div className="bg-[#00a884] text-white px-4 py-3 flex items-center gap-3 shadow-sm">
           <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
             <svg viewBox="0 0 24 24" className="w-6 h-6 fill-[#00a884]">
@@ -94,7 +100,10 @@ function ConversationsContent() {
       </div>
 
       {/* Center Panel - Chat Area */}
-      <div className="flex-1 flex flex-col bg-[#f0f2f5]">
+      <div className={`
+        ${selectedConversation ? 'flex' : 'hidden lg:flex'} 
+        flex-1 flex-col bg-[#f0f2f5]
+      `}>
         {selectedConversation ? (
           <ConversationDetail
             conversation={selectedConversation}

@@ -296,7 +296,7 @@ img {
 
 /* WhatsApp-style message bubbles */
 .message-bubble {
-  @apply max-w-xs lg:max-w-md px-4 py-2 rounded-lg;
+  @apply max-w-[85%] sm:max-w-[75%] lg:max-w-md px-4 py-3 lg:px-4 lg:py-3 rounded-lg;
 }
 
 .message-bubble.user {
@@ -307,6 +307,52 @@ img {
 .message-bubble.assistant {
   @apply bg-gray-100 text-gray-900 mr-auto;
   border-bottom-left-radius: 4px;
+}
+
+/* Mobile chat optimizations */
+@media (max-width: 1024px) {
+  .chat-container-mobile {
+    padding-bottom: 80px; /* Space for mobile nav */
+  }
+  
+  .chat-input-mobile {
+    min-height: 48px;
+    font-size: 16px; /* Prevent zoom on iOS */
+    padding: 12px 16px;
+  }
+  
+  .chat-button-mobile {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  
+  .message-bubble-mobile {
+    max-width: 85%;
+    padding: 16px;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  
+  /* Mobile message spacing */
+  .messages-container-mobile {
+    padding: 8px 12px;
+  }
+  
+  .messages-container-mobile > * + * {
+    margin-top: 16px;
+  }
+  
+  /* Prevent overflow and ensure full width utilization */
+  .chat-messages-area {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  
+  .chat-input-area {
+    width: 100%;
+    max-width: 100%;
+  }
 }
 
 /* Status indicators */
@@ -620,6 +666,33 @@ img {
     }
     to {
       opacity: 1;
+    }
+  }
+
+  /* Mobile conversation optimizations */
+  @media (max-width: 1024px) {
+    .conversation-list-mobile {
+      padding-bottom: 80px; /* Space for mobile nav */
+    }
+    
+    .conversation-item-mobile {
+      min-height: 72px;
+      padding: 16px;
+    }
+    
+    .conversation-avatar-mobile {
+      width: 56px;
+      height: 56px;
+    }
+    
+    .conversation-text-mobile {
+      font-size: 16px;
+      line-height: 1.4;
+    }
+    
+    .conversation-preview-mobile {
+      font-size: 14px;
+      line-height: 1.3;
     }
   }
 

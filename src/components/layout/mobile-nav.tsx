@@ -7,73 +7,37 @@ import {
   MessageSquare, 
   Users, 
   Calendar,
-  Settings,
   Home,
   UserCog,
   BookOpen,
   Send,
-  UsersRound
+  UsersRound,
+  Bell,
+  Smartphone
 } from 'lucide-react';
+import { mainNavigation, secondaryNavigation } from '@/constants/navigation';
 
 const MobileNav = () => {
   const pathname = usePathname();
 
-  const navItems = [
-    {
-      name: 'Dashboard',
-      href: '/dashboard',
-      icon: Home,
-      active: pathname === '/dashboard'
-    },
-    {
-      name: 'Messages',
-      href: '/conversations',
-      icon: MessageSquare,
-      active: pathname === '/conversations' || pathname.startsWith('/conversations/')
-    },
-    {
-      name: 'CRM',
-      href: '/crm',
-      icon: Users,
-      active: pathname === '/crm' || pathname.startsWith('/crm/')
-    },
-    {
-      name: 'Handover',
-      href: '/handover',
-      icon: UserCog,
-      active: pathname === '/handover'
-    },
-    {
-      name: 'Knowledge',
-      href: '/knowledge-base',
-      icon: BookOpen,
-      active: pathname === '/knowledge-base' || pathname.startsWith('/knowledge-base/')
-    },
-    {
-      name: 'Bulk Send',
-      href: '/bulk-send',
-      icon: Send,
-      active: pathname === '/bulk-send'
-    },
-    {
-      name: 'Groups',
-      href: '/group-creation',
-      icon: UsersRound,
-      active: pathname === '/group-creation'
-    },
-    {
-      name: 'Scheduled',
-      href: '/scheduled-messages',
-      icon: Calendar,
-      active: pathname === '/scheduled-messages'
-    },
-    {
-      name: 'Settings',
-      href: '/settings',
-      icon: Settings,
-      active: pathname === '/settings' || pathname.startsWith('/settings/')
-    }
+  // Combine main navigation with secondary navigation for mobile
+  const allNavItems = [
+    ...mainNavigation, // Include all main navigation items
+    ...secondaryNavigation
   ];
+
+  // Create mobile-friendly nav items with proper naming and active states
+  const navItems = allNavItems.map(item => ({
+    name: item.name === 'Knowledge Base' ? 'Knowledge' : 
+          item.name === 'Group Creation' ? 'Groups' :
+          item.name === 'Scheduled Messages' ? 'Scheduled' :
+          item.name === 'WhatsApp Connect' ? 'Connect' :
+          item.name === 'Conversations' ? 'Messages' : 
+          item.name,
+    href: item.href,
+    icon: item.icon,
+    active: pathname === item.href || pathname.startsWith(`${item.href}/`)
+  }));
 
   return (
     <nav className="mobile-nav safe-area-bottom">

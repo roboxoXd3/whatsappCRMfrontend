@@ -182,7 +182,7 @@ export function Sidebar() {
                 "px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 transition-all duration-300",
                 sidebarOpen ? "opacity-100" : "lg:opacity-0 lg:h-0 lg:mb-0 lg:overflow-hidden"
               )}>
-                Settings
+                Tools
               </h3>
               <ul className="space-y-1">
                 {secondaryNavigation.map((item) => {

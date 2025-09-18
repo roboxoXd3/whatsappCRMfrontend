@@ -188,8 +188,9 @@ export function ConversationList({
         key={conversation.id}
         onClick={() => handleConversationClick(conversation)}
         className={cn(
-          "flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-all duration-200",
-          "border-l-4 border-transparent hover:border-blue-300",
+          "flex items-center gap-3 p-4 lg:p-3 hover:bg-gray-50 cursor-pointer transition-all duration-200",
+          "border-l-4 border-transparent hover:border-blue-300 touch-target",
+          "min-h-[72px] lg:min-h-[60px]", // Larger touch targets on mobile
           isSelected && "bg-blue-50 border-l-blue-500 shadow-sm"
         )}
         style={{
@@ -199,7 +200,7 @@ export function ConversationList({
       >
         {/* Avatar */}
         <div className="relative">
-          <Avatar className="w-12 h-12 ring-2 ring-white shadow-sm">
+          <Avatar className="w-14 h-14 lg:w-12 lg:h-12 ring-2 ring-white shadow-sm">
             {conversation.contact.profile_image_url ? (
               <img 
                 src={conversation.contact.profile_image_url} 
@@ -207,7 +208,7 @@ export function ConversationList({
                 className="w-full h-full object-cover rounded-full"
               />
             ) : (
-              <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
+              <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium text-lg lg:text-base">
                 {getInitials(displayName)}
               </AvatarFallback>
             )}
@@ -227,15 +228,15 @@ export function ConversationList({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <h4 className="font-medium text-gray-900 truncate">
+            <h4 className="font-medium text-gray-900 truncate text-base lg:text-sm">
               {displayName}
             </h4>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 flex-shrink-0">
+              <span className="text-sm lg:text-xs text-gray-500 flex-shrink-0">
                 {formatTime(conversation.last_message_at)}
               </span>
               {conversation.unread_count && conversation.unread_count > 0 && (
-                <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center animate-pulse">
+                <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs rounded-full min-w-[22px] lg:min-w-[20px] h-6 lg:h-5 flex items-center justify-center animate-pulse">
                   {conversation.unread_count}
                 </Badge>
               )}
@@ -245,9 +246,9 @@ export function ConversationList({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               {conversation.last_message_role === 'assistant' && (
-                <span className="text-blue-500 text-xs">✓</span>
+                <span className="text-blue-500 text-sm lg:text-xs">✓</span>
               )}
-              <p className="text-sm text-gray-600 truncate">
+              <p className="text-sm lg:text-sm text-gray-600 truncate leading-relaxed">
                 {conversation.last_message_preview || 'No messages yet'}
               </p>
             </div>
@@ -255,10 +256,10 @@ export function ConversationList({
             {/* Conversation status badges */}
             <div className="flex gap-1 ml-2">
               {conversation.bot_enabled === false && (
-                <div className="w-2 h-2 bg-orange-400 rounded-full" title="Bot disabled" />
+                <div className="w-3 h-3 lg:w-2 lg:h-2 bg-orange-400 rounded-full" title="Bot disabled" />
               )}
               {conversation.handover_requested && (
-                <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" title="Human support requested" />
+                <div className="w-3 h-3 lg:w-2 lg:h-2 bg-red-400 rounded-full animate-pulse" title="Human support requested" />
               )}
             </div>
           </div>
@@ -333,40 +334,40 @@ export function ConversationList({
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Enhanced Search Bar */}
-      <div className="p-3 border-b border-gray-200 bg-white">
+      <div className="p-4 lg:p-3 border-b border-gray-200 bg-white">
         <div className="space-y-3">
           {/* Search Input */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 lg:h-4 lg:w-4 text-gray-400" />
             <Input
-              placeholder="Search conversations by name, phone, or message..."
+              placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-10 bg-gray-50 border-gray-200 rounded-lg focus:bg-white transition-colors"
+              className="pl-11 lg:pl-10 pr-10 bg-gray-50 border-gray-200 rounded-lg focus:bg-white transition-colors h-12 lg:h-10 text-base lg:text-sm"
             />
             {searchQuery && (
               <button
                 onClick={clearSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5 lg:h-4 lg:w-4" />
               </button>
             )}
           </div>
 
-          {/* Filters and Sort */}
+          {/* Filters and Sort - Mobile Optimized */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 lg:gap-2">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowFilters(!showFilters)}
-                className="text-gray-600 hover:text-gray-900"
+                className="text-gray-600 hover:text-gray-900 h-9 lg:h-8 px-3 lg:px-2"
               >
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
+                <Filter className="h-4 w-4 mr-1 lg:mr-2" />
+                <span className="hidden sm:inline">Filter</span>
                 {filterBy !== 'all' && (
-                  <Badge variant="secondary" className="ml-2 h-5 text-xs">
+                  <Badge variant="secondary" className="ml-1 lg:ml-2 h-5 text-xs">
                     {getFilteredCount(filterBy)}
                   </Badge>
                 )}
@@ -376,19 +377,21 @@ export function ConversationList({
                 variant="ghost"
                 size="sm"
                 onClick={() => setSortBy(sortBy === 'recent' ? 'name' : sortBy === 'name' ? 'unread' : 'recent')}
-                className="text-gray-600 hover:text-gray-900"
+                className="text-gray-600 hover:text-gray-900 h-9 lg:h-8 px-3 lg:px-2"
               >
-                <SortAsc className="h-4 w-4 mr-2" />
-                {sortBy === 'recent' ? 'Recent' : sortBy === 'name' ? 'Name' : 'Unread'}
+                <SortAsc className="h-4 w-4 mr-1 lg:mr-2" />
+                <span className="text-xs lg:text-sm">
+                  {sortBy === 'recent' ? 'Recent' : sortBy === 'name' ? 'Name' : 'Unread'}
+                </span>
               </Button>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 hidden sm:inline">
                 {conversations.length} of {rawConversations.length}
               </span>
-              <Button variant="ghost" size="sm" onClick={onNewConversation}>
-                <Plus className="h-4 w-4" />
+              <Button variant="ghost" size="sm" onClick={onNewConversation} className="h-9 lg:h-8 w-9 lg:w-8 p-0">
+                <Plus className="h-5 w-5 lg:h-4 lg:w-4" />
               </Button>
             </div>
           </div>
@@ -453,7 +456,7 @@ export function ConversationList({
       )}
 
       {/* Conversations List */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent pb-20 lg:pb-0">
         {renderConversationsList()}
       </div>
 

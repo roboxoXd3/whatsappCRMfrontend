@@ -8,7 +8,6 @@ import { useAppStore } from '@/lib/stores/app';
 import { 
   Search, 
   Bell, 
-  Settings, 
   HelpCircle,
   X
 } from 'lucide-react';
@@ -93,10 +92,6 @@ export function Header() {
             <HelpCircle className="h-5 w-5" />
           </Button>
 
-          {/* Settings */}
-          <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
-          </Button>
         </div>
       </div>
 

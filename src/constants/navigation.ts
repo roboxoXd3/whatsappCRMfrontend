@@ -2,13 +2,11 @@ import {
   LayoutDashboard,
   MessageSquare,
   Users,
-  Settings,
   Phone,
   UserPlus,
   Calendar,
   Target,
   Bell,
-  Key,
   Send,
   UsersRound,
   UserCog,
@@ -112,20 +110,6 @@ export const secondaryNavigation: NavigationItem[] = [
     description: 'Connect your WhatsApp account',
     badge: 'New',
   },
-  {
-    name: 'Settings',
-    href: '/settings',
-    icon: Settings,
-    description: 'Application preferences',
-    children: [
-      {
-        name: 'API Keys',
-        href: '/settings/api-keys',
-        icon: Key,
-        description: 'Manage OpenAI and WhatsApp API keys',
-      },
-    ],
-  },
 ];
 
 export const quickActions: NavigationItem[] = [
@@ -154,8 +138,6 @@ export const breadcrumbLabels: Record<string, string> = {
   'bulk-send': 'Bulk Send',
   'group-creation': 'Group Creation',
   'scheduled-messages': 'Scheduled Messages',
-  settings: 'Settings',
-  'api-keys': 'API Keys',
   notifications: 'Notifications',
   handover: 'Handover Dashboard',
   'whatsapp-connect': 'WhatsApp Connect',

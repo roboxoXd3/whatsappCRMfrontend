@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/lib/stores/auth';
 import { 
   Search, 
   Users, 
@@ -118,6 +119,8 @@ interface GroupsResponse {
   data: {
     groups: Group[];
     total: number;
+    cached?: boolean;
+    synced_from_api?: boolean;
   };
 }
 
@@ -163,6 +166,7 @@ const getContactInfo = (contact: Contact) => {
 };
 
 export default function GroupCreationPage() {
+  const { token } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
@@ -171,9 +175,8 @@ export default function GroupCreationPage() {
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   
-  // Profile picture cache
-  const [profilePictureCache, setProfilePictureCache] = useState<Record<string, string | null>>({});
-  const [loadingProfilePictures, setLoadingProfilePictures] = useState<Set<string>>(new Set());
+  // Profile picture cache (for database-stored images only)
+  const [profilePictureCache] = useState<Record<string, string | null>>({});
 
   // Groups management state
   const [groups, setGroups] = useState<Group[]>([]);
@@ -197,66 +200,22 @@ export default function GroupCreationPage() {
   // Manual contact sync state
   const [isSyncingContacts, setIsSyncingContacts] = useState(false);
 
-  // Fetch profile picture for a contact
-  const fetchProfilePicture = async (phoneNumber: string) => {
-    // Check cache first
-    if (profilePictureCache[phoneNumber] !== undefined) {
-      return profilePictureCache[phoneNumber];
-    }
-
-    // Check if already loading
-    if (loadingProfilePictures.has(phoneNumber)) {
-      return null;
-    }
-
-    // Mark as loading
-    setLoadingProfilePictures(prev => new Set(prev).add(phoneNumber));
-
-    try {
-      const cleanPhone = phoneNumber.replace('@s.whatsapp.net', '').replace('@c.us', '');
-      const response = await fetch(`${API_BASE}/api/group-messaging/contacts/${cleanPhone}/picture`);
-      const data = await response.json();
-
-      let pictureUrl = null;
-      if (data.success && data.data?.profile_picture_url) {
-        pictureUrl = data.data.profile_picture_url;
-      }
-
-      // Cache the result (even if null)
-      setProfilePictureCache(prev => ({
-        ...prev,
-        [phoneNumber]: pictureUrl
-      }));
-
-      return pictureUrl;
-    } catch (error) {
-      console.error(`Failed to fetch profile picture for ${phoneNumber}:`, error);
-      // Cache null result to avoid repeated requests
-      setProfilePictureCache(prev => ({
-        ...prev,
-        [phoneNumber]: null
-      }));
-      return null;
-    } finally {
-      // Remove from loading set
-      setLoadingProfilePictures(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(phoneNumber);
-        return newSet;
-      });
-    }
-  };
 
   // Manual contact sync function (now efficient)
   const syncContactsFromWasender = async () => {
     setIsSyncingContacts(true);
     try {
       // Use the force-sync endpoint for manual sync (user explicitly requested it)
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_BASE}/api/group-messaging/contacts/force-sync`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        headers
       });
       const data = await response.json();
 
@@ -298,7 +257,14 @@ export default function GroupCreationPage() {
         only_wasender: 'true'
       });
 
-      const response = await fetch(`${API_BASE}/api/group-messaging/contacts/search?${params}`);
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_BASE}/api/group-messaging/contacts/search?${params}`, {
+        headers
+      });
       const data: ContactSearchResponse = await response.json();
 
       if (data.success) {
@@ -348,19 +314,41 @@ export default function GroupCreationPage() {
     setSelectedContacts(prev => prev.filter(c => c.id !== contactId));
   };
 
-  // Load groups from API
-  const loadGroups = async () => {
+  // Load groups from API (with caching support)
+  const loadGroups = async (forceRefresh: boolean = false) => {
     setIsLoadingGroups(true);
     try {
-      // Add cache-busting timestamp to ensure fresh data
-      const response = await fetch(`${API_BASE}/api/group-messaging/groups?_t=${Date.now()}`, {
+      const url = forceRefresh 
+        ? `${API_BASE}/api/group-messaging/groups?force_refresh=true&_t=${Date.now()}`
+        : `${API_BASE}/api/group-messaging/groups`;
+      
+      console.log('Loading groups from:', url);
+      
+      const headers: Record<string, string> = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      };
+
+      // Add authentication header if token is available
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
+        headers
       });
+      
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response body:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+      
       const data: GroupsResponse = await response.json();
 
       if (data.success) {
@@ -370,12 +358,17 @@ export default function GroupCreationPage() {
           console.log(`Group ${index}: ${group.name} - ${group.member_count} members`);
         });
         setGroups(data.data.groups);
+        
+        // Show different messages based on cache status
+        const cacheStatus = data.data.cached ? ' (from cache)' : data.data.synced_from_api ? ' (synced from API)' : '';
+        toast.success(`Loaded ${data.data.groups.length} groups successfully${cacheStatus}`);
       } else {
         console.error('Failed to load groups:', data);
-        toast.error('Failed to load groups');
+        toast.error('Failed to load groups: Unknown error');
       }
     } catch (error) {
-      toast.error('Failed to connect to server');
+      console.error('Groups loading error:', error);
+      toast.error(`Failed to connect to server: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoadingGroups(false);
     }
@@ -385,11 +378,16 @@ export default function GroupCreationPage() {
   const sendMessageToGroup = async (groupJid: string, message: string) => {
     setIsSendingMessage(true);
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_BASE}/api/group-messaging/groups/${groupJid}/send-message`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           message_content: message.trim(),
           message_type: 'text',
@@ -426,11 +424,16 @@ export default function GroupCreationPage() {
   const scheduleMessageToGroup = async (groupJid: string, message: string, scheduledAt: string, recurring?: string) => {
     setIsSchedulingMessage(true);
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_BASE}/api/group-messaging/schedule-message`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           message_content: message.trim(),
           target_groups: [groupJid],
@@ -509,65 +512,37 @@ export default function GroupCreationPage() {
     return '';
   };
 
-  // Profile Image Component
+  // Profile Image Component - Simplified without API calls
   const ProfileImage: React.FC<{ contact: Contact; size?: 'sm' | 'md' }> = ({ contact, size = 'md' }) => {
-    const [imageUrl, setImageUrl] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [hasError, setHasError] = useState(false);
-    
     const contactInfo = getContactInfo(contact);
     const sizeClasses = size === 'sm' ? 'w-8 h-8' : 'w-10 h-10';
     const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
     
-    useEffect(() => {
-      const loadProfilePicture = async () => {
-        if (!contactInfo.phoneNumber) return;
-        
-        // Check cache first
-        const cached = profilePictureCache[contactInfo.phoneNumber];
-        if (cached !== undefined) {
-          setImageUrl(cached);
-          return;
-        }
-        
-        setIsLoading(true);
-        try {
-          const url = await fetchProfilePicture(contactInfo.phoneNumber);
-          setImageUrl(url);
-        } catch (error) {
-          console.error('Error loading profile picture:', error);
-          setHasError(true);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      
-      loadProfilePicture();
-    }, [contactInfo.phoneNumber, profilePictureCache]);
+    // Only use cached profile image if available in contact data (from database)
+    const cachedImageUrl = contact.profile_image_url;
     
-    if (isLoading) {
-      return (
-        <div className={`${sizeClasses} rounded-full bg-gray-200 animate-pulse flex items-center justify-center`}>
-          <Loader2 className={`${iconSize} text-gray-400 animate-spin`} />
-        </div>
-      );
-    }
-    
-    if (imageUrl && !hasError) {
+    if (cachedImageUrl) {
       return (
         <img
-          src={imageUrl}
+          src={cachedImageUrl}
           alt={contactInfo.name || 'Profile'}
           className={`${sizeClasses} rounded-full object-cover border-2 border-gray-200`}
-          onError={() => setHasError(true)}
+          onError={(e) => {
+            // Hide image on error and show default avatar instead
+            e.currentTarget.style.display = 'none';
+          }}
         />
       );
     }
     
-    // Fallback avatar
+    // Default avatar with contact initials or user icon
+    const initials = contactInfo.name
+      ? contactInfo.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+      : '';
+    
     return (
-      <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center`}>
-        <User className={`${iconSize} text-white`} />
+      <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium shadow-sm`}>
+        {initials || <User className={`${iconSize} text-white`} />}
       </div>
     );
   };
@@ -606,11 +581,16 @@ export default function GroupCreationPage() {
         return;
       }
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_BASE}/api/group-messaging/groups/create-with-contacts`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           group_name: groupName.trim(),
           contact_ids: selectedContacts.map(c => c.id),
@@ -1025,19 +1005,35 @@ export default function GroupCreationPage() {
                 <MessageSquare className="h-5 w-5" />
                 Your WhatsApp Groups
               </CardTitle>
-              <Button
-                variant="outline"
-                onClick={loadGroups}
-                disabled={isLoadingGroups}
-                size="sm"
-              >
-                {isLoadingGroups ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                )}
-                Refresh
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => loadGroups(false)}
+                  disabled={isLoadingGroups}
+                  size="sm"
+                >
+                  {isLoadingGroups ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  Refresh
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => loadGroups(true)}
+                  disabled={isLoadingGroups}
+                  size="sm"
+                  className="text-xs"
+                >
+                  {isLoadingGroups ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                  )}
+                  Force Sync
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {isLoadingGroups ? (
