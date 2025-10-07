@@ -29,6 +29,10 @@ export function BulkSendForm() {
   const [csvUploadStatus, setCsvUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
   const [isFormattingMessage, setIsFormattingMessage] = useState(false);
+  const [useAIPersonalization, setUseAIPersonalization] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewMessages, setPreviewMessages] = useState<any[]>([]);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddContact = () => {
@@ -249,6 +253,69 @@ export function BulkSendForm() {
     }
   };
 
+  const handlePreview = async () => {
+    if (!message.trim() || selectedContacts.length === 0) {
+      alert('Please enter a message and add contacts first');
+      return;
+    }
+
+    setIsLoadingPreview(true);
+    
+    try {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const response = await fetch(`${baseURL}/api/bulk-send/preview-personalization`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message.trim(),
+          contacts: selectedContacts.slice(0, 5).map(c => ({
+            phone: c.phone,
+            name: c.name,
+            company: c.company || '',
+            email: c.email || ''
+          })),
+          use_ai_personalization: useAIPersonalization,
+          sample_size: 5
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status === 'success') {
+        setPreviewMessages(result.data.previews);
+        setShowPreview(true);
+      } else {
+        alert('Failed to generate preview');
+      }
+    } catch (error) {
+      console.error('Preview error:', error);
+      alert('Failed to generate preview');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  const insertVariable = (variable: string) => {
+    const textarea = document.getElementById('message') as HTMLTextAreaElement;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = message;
+      const before = text.substring(0, start);
+      const after = text.substring(end);
+      const newText = before + `{${variable}}` + after;
+      setMessage(newText);
+      
+      // Set cursor position after inserted variable
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + variable.length + 2, start + variable.length + 2);
+      }, 0);
+    }
+  };
+
   const handleBulkSend = async () => {
     if (!message.trim() || selectedContacts.length === 0) return;
 
@@ -265,9 +332,16 @@ export function BulkSendForm() {
         },
         body: JSON.stringify({
           message: message.trim(),
-          contacts: selectedContacts.map(c => c.phone),
+          contacts: selectedContacts.map(c => ({
+            phone: c.phone,
+            name: c.name,
+            company: c.company || '',
+            email: c.email || ''
+          })),
           campaign_name: `Bulk Send ${new Date().toLocaleString()}`,
-          with_retry: true
+          with_retry: true,
+          use_ai_personalization: useAIPersonalization,
+          personalize_per_contact: true
         }),
       });
 
@@ -326,11 +400,48 @@ export function BulkSendForm() {
           </div>
           
           <div className="space-y-4">
+            {/* Template Variable Helpers */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-xs font-medium text-blue-800 mb-2">Insert Variables:</p>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => insertVariable('name')}
+                  className="h-7 text-xs"
+                  type="button"
+                >
+                  + Name
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => insertVariable('company')}
+                  className="h-7 text-xs"
+                  type="button"
+                >
+                  + Company
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => insertVariable('email')}
+                  className="h-7 text-xs"
+                  type="button"
+                >
+                  + Email
+                </Button>
+              </div>
+              <p className="text-xs text-blue-600 mt-2">
+                💡 Variables will be replaced with actual contact data
+              </p>
+            </div>
+
             <div>
               <Label htmlFor="message">Message Content</Label>
               <Textarea
                 id="message"
-                placeholder="Type your message here..."
+                placeholder="Type your message here... Use variables like {name}, {company}"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 className="mt-1 min-h-[120px] resize-none"
@@ -341,10 +452,61 @@ export function BulkSendForm() {
                   {message.length}/1000 characters
                 </span>
                 <span className="text-sm text-gray-500">
-                  Estimated cost: ${(selectedContacts.length * 0.01).toFixed(2)}
+                  Estimated cost: ${(selectedContacts.length * (useAIPersonalization ? 0.005 : 0.001)).toFixed(2)}
                 </span>
               </div>
             </div>
+
+            {/* AI Personalization Toggle */}
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="ai-personalization"
+                  checked={useAIPersonalization}
+                  onChange={(e) => setUseAIPersonalization(e.target.checked)}
+                  className="mt-1"
+                  disabled={isLoading}
+                />
+                <div className="flex-1">
+                  <label htmlFor="ai-personalization" className="font-medium text-sm text-purple-900 cursor-pointer">
+                    🤖 AI Personalization (Recommended)
+                  </label>
+                  <p className="text-xs text-purple-700 mt-1">
+                    AI creates unique variations for each contact - no two messages are the same!
+                    Prevents spam detection and increases engagement.
+                  </p>
+                  {useAIPersonalization && (
+                    <div className="mt-2 text-xs text-purple-600 bg-white bg-opacity-50 rounded p-2">
+                      ✨ <strong>Smart Detection:</strong> AI will automatically detect available data
+                      (name, company, email) and personalize accordingly
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Preview Button */}
+            {selectedContacts.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={handlePreview}
+                disabled={isLoading || isLoadingPreview || !message.trim()}
+                className="w-full"
+              >
+                {isLoadingPreview ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2 animate-spin" />
+                    Generating Preview...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Preview Personalized Messages (First 5)
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </Card>
 
@@ -551,16 +713,54 @@ export function BulkSendForm() {
 
         {/* Message Preview */}
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Message Preview</h3>
-          <div className="bg-gray-50 rounded-lg p-4 min-h-[120px]">
-            {message.trim() ? (
-              <div className="whitespace-pre-wrap text-sm">{message}</div>
-            ) : (
-              <div className="text-gray-500 italic">
-                Your message will appear here...
-              </div>
-            )}
-          </div>
+          <h3 className="text-lg font-semibold mb-4">
+            {showPreview ? 'Personalized Preview' : 'Message Preview'}
+          </h3>
+          {showPreview && previewMessages.length > 0 ? (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {previewMessages.map((preview, index) => (
+                <div key={index} className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-blue-900">
+                      {preview.contact.name || preview.contact.phone}
+                    </span>
+                    <Badge variant="secondary" className="text-xs">
+                      {preview.personalization_level}
+                    </Badge>
+                  </div>
+                  <div className="text-sm text-gray-800 bg-white rounded p-3 mb-2">
+                    {preview.personalized_message}
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-600">
+                      {preview.available_fields?.length || 0} fields available
+                    </span>
+                    <span className="text-gray-600">
+                      {preview.character_count} chars
+                    </span>
+                  </div>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPreview(false)}
+                className="w-full mt-2"
+              >
+                Close Preview
+              </Button>
+            </div>
+          ) : (
+            <div className="bg-gray-50 rounded-lg p-4 min-h-[120px]">
+              {message.trim() ? (
+                <div className="whitespace-pre-wrap text-sm">{message}</div>
+              ) : (
+                <div className="text-gray-500 italic">
+                  Your message will appear here...
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* Job Status */}
