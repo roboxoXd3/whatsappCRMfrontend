@@ -23,14 +23,15 @@ import {
 
 interface BulkJob {
   id: string;
-  message: string;
-  totalContacts: number;
-  successfulSends: number;
-  failedSends: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
-  createdAt: string;
-  completedAt?: string;
-  duration?: string;
+  name: string;
+  message_content: string;
+  total_contacts: number;
+  successful_sends: number;
+  failed_sends: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
 }
 
 interface MessageResult {
@@ -133,8 +134,8 @@ export function BulkSendHistory() {
     switch (status) {
       case 'completed':
         return <Badge className="bg-green-100 text-green-800">Completed</Badge>;
-      case 'in_progress':
-        return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>;
+      case 'running':
+        return <Badge className="bg-blue-100 text-blue-800">Running</Badge>;
       case 'failed':
         return <Badge className="bg-red-100 text-red-800">Failed</Badge>;
       case 'cancelled':
@@ -148,7 +149,7 @@ export function BulkSendHistory() {
     switch (status) {
       case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'in_progress':
+      case 'running':
         return <Clock className="h-4 w-4 text-blue-600 animate-spin" />;
       case 'failed':
         return <AlertCircle className="h-4 w-4 text-red-600" />;
@@ -168,8 +169,8 @@ export function BulkSendHistory() {
   };
 
   const getSuccessRate = (job: BulkJob) => {
-    if (job.totalContacts === 0) return 0;
-    return Math.round((job.successfulSends / job.totalContacts) * 100);
+    if (job.total_contacts === 0) return 0;
+    return Math.round((job.successful_sends / job.total_contacts) * 100);
   };
 
   return (
@@ -227,7 +228,7 @@ export function BulkSendHistory() {
             <div>
               <p className="text-sm font-medium text-gray-500">Messages Sent</p>
               <p className="text-2xl font-bold">
-                {jobs.reduce((sum, job) => sum + job.successfulSends, 0)}
+                {jobs.reduce((sum, job) => sum + job.successful_sends, 0)}
               </p>
             </div>
           </div>
@@ -240,8 +241,8 @@ export function BulkSendHistory() {
               <p className="text-sm font-medium text-gray-500">Success Rate</p>
               <p className="text-2xl font-bold">
                 {Math.round(
-                  (jobs.reduce((sum, job) => sum + job.successfulSends, 0) /
-                   jobs.reduce((sum, job) => sum + job.totalContacts, 0)) * 100
+                  (jobs.reduce((sum, job) => sum + job.successful_sends, 0) /
+                   jobs.reduce((sum, job) => sum + job.total_contacts, 0)) * 100
                 )}%
               </p>
             </div>
@@ -254,7 +255,7 @@ export function BulkSendHistory() {
             <div>
               <p className="text-sm font-medium text-gray-500">Active Jobs</p>
               <p className="text-2xl font-bold">
-                {jobs.filter(job => job.status === 'in_progress').length}
+                {jobs.filter(job => job.status === 'running').length}
               </p>
             </div>
           </div>
@@ -286,8 +287,8 @@ export function BulkSendHistory() {
                 <TableRow key={job.id}>
                   <TableCell className="font-mono text-sm">{job.id}</TableCell>
                   <TableCell className="max-w-xs">
-                    <div className="truncate" title={job.message}>
-                      {job.message}
+                    <div className="truncate" title={job.message_content}>
+                      {job.message_content}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -298,9 +299,9 @@ export function BulkSendHistory() {
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      <div className="font-medium">{job.totalContacts} total</div>
+                      <div className="font-medium">{job.total_contacts} total</div>
                       <div className="text-gray-500">
-                        {job.successfulSends} sent, {job.failedSends} failed
+                        {job.successful_sends} sent, {job.failed_sends} failed
                       </div>
                     </div>
                   </TableCell>
@@ -318,10 +319,10 @@ export function BulkSendHistory() {
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-gray-500">
-                    {formatDate(job.createdAt)}
+                    {formatDate(job.created_at)}
                   </TableCell>
                   <TableCell className="text-sm text-gray-500">
-                    {job.duration || '-'}
+                    {job.completed_at ? new Date(job.completed_at).toLocaleString() : '-'}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
