@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuthStore } from '@/lib/stores/auth';
 
 interface Contact {
   id: string;
@@ -20,11 +21,12 @@ interface Contact {
 }
 
 export function BulkSendForm() {
+  const { token } = useAuthStore(); // Get auth token
   const [message, setMessage] = useState('');
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
   const [contactInput, setContactInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [jobStatus, setJobStatus] = useState<'idle' | 'sending' | 'completed' | 'failed'>('idle');
+  const [jobStatus, setJobStatus] = useState<'idle' | 'sending' | 'completed' | 'failed' | 'cancelled'>('idle');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvUploadStatus, setCsvUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
@@ -33,6 +35,9 @@ export function BulkSendForm() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewMessages, setPreviewMessages] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
+  const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0, successful: 0, failed: 0 });
+  const [isStopping, setIsStopping] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddContact = () => {
@@ -267,6 +272,7 @@ export function BulkSendForm() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           message: message.trim(),
@@ -316,11 +322,47 @@ export function BulkSendForm() {
     }
   };
 
+  const handleStopSending = async () => {
+    if (!activeCampaignId) return;
+    
+    setIsStopping(true);
+    
+    try {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const response = await fetch(`${baseURL}/api/bulk-send/cancel/${activeCampaignId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.status === 'success') {
+        setJobStatus('cancelled');
+        console.log('Campaign cancelled successfully');
+        alert('Campaign is stopping. The current message will complete, then it will stop.');
+      } else {
+        console.error('Failed to cancel campaign:', result.message);
+        alert('Failed to stop campaign. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error cancelling campaign:', error);
+      alert('Error stopping campaign. Please try again.');
+    } finally {
+      setIsStopping(false);
+      setActiveCampaignId(null);
+      setIsLoading(false);
+    }
+  };
+
   const handleBulkSend = async () => {
     if (!message.trim() || selectedContacts.length === 0) return;
 
     setIsLoading(true);
     setJobStatus('sending');
+    setSendingProgress({ current: 0, total: selectedContacts.length, successful: 0, failed: 0 });
 
     try {
       // Call the new bulk send API endpoint
@@ -329,6 +371,7 @@ export function BulkSendForm() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           message: message.trim(),
@@ -348,22 +391,40 @@ export function BulkSendForm() {
       const result = await response.json();
 
       if (response.ok && result.status === 'success') {
+        // Store campaign ID for cancellation
+        if (result.data.campaign_id) {
+          setActiveCampaignId(result.data.campaign_id);
+        }
+        
+        // Update final progress
+        setSendingProgress({
+          current: result.data.total_contacts,
+          total: result.data.total_contacts,
+          successful: result.data.successful_sends,
+          failed: result.data.failed_sends
+        });
+        
         setJobStatus('completed');
         setMessage('');
         setSelectedContacts([]);
         clearCsvUpload();
+        setActiveCampaignId(null);
         
         // Show success message with details
         console.log('Bulk send completed:', result.data);
+        alert(`✅ Bulk send completed!\n✓ Sent: ${result.data.successful_sends}\n✗ Failed: ${result.data.failed_sends}`);
       } else {
         setJobStatus('failed');
         console.error('Bulk send failed:', result.message);
+        alert(`❌ Bulk send failed: ${result.message}`);
       }
     } catch (error) {
       console.error('Bulk send failed:', error);
       setJobStatus('failed');
+      alert('❌ Bulk send failed. Please check your connection.');
     } finally {
       setIsLoading(false);
+      setActiveCampaignId(null);
     }
   };
 
@@ -646,8 +707,62 @@ export function BulkSendForm() {
           </Tabs>
         </Card>
 
-        {/* Send Button */}
+        {/* Send Button & Progress */}
         <Card className="p-6">
+          {jobStatus === 'sending' && (
+            <div className="mb-4 space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Sending Progress</span>
+                <span className="text-gray-600">
+                  {sendingProgress.current} / {sendingProgress.total}
+                </span>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                  style={{ 
+                    width: `${sendingProgress.total > 0 ? (sendingProgress.current / sendingProgress.total) * 100 : 0}%` 
+                  }}
+                ></div>
+              </div>
+              
+              {/* Stats */}
+              <div className="flex items-center justify-between text-xs text-gray-600">
+                <div className="flex gap-3">
+                  <span className="text-green-600">✓ {sendingProgress.successful} sent</span>
+                  {sendingProgress.failed > 0 && (
+                    <span className="text-red-600">✗ {sendingProgress.failed} failed</span>
+                  )}
+                </div>
+                <span>~{Math.ceil((sendingProgress.total - sendingProgress.current) * 3 / 60)}m remaining</span>
+              </div>
+              
+              {/* Stop Button */}
+              <Button
+                onClick={handleStopSending}
+                disabled={isStopping}
+                variant="destructive"
+                className="w-full"
+                size="sm"
+              >
+                {isStopping ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2 animate-spin" />
+                    Stopping...
+                  </>
+                ) : (
+                  <>
+                    <X className="h-4 w-4 mr-2" />
+                    Stop Sending
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+          
+          {/* Send Button */}
           <Button
             onClick={handleBulkSend}
             disabled={!message.trim() || selectedContacts.length === 0 || isLoading}
@@ -657,7 +772,7 @@ export function BulkSendForm() {
             {isLoading ? (
               <>
                 <Clock className="h-4 w-4 mr-2 animate-spin" />
-                Sending to {selectedContacts.length} contacts...
+                Starting bulk send...
               </>
             ) : (
               <>
@@ -666,6 +781,25 @@ export function BulkSendForm() {
               </>
             )}
           </Button>
+          
+          {/* Status Messages */}
+          {jobStatus === 'completed' && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+              ✅ Bulk send completed successfully!
+            </div>
+          )}
+          
+          {jobStatus === 'cancelled' && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              ⚠️ Campaign was stopped by user
+            </div>
+          )}
+          
+          {jobStatus === 'failed' && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+              ❌ Bulk send failed. Please try again.
+            </div>
+          )}
         </Card>
       </div>
 

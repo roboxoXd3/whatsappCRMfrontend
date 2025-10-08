@@ -11,6 +11,7 @@ import { useConversations } from '@/hooks/useConversations';
 function ConversationsContent() {
   const searchParams = useSearchParams();
   const targetConversationId = searchParams.get('conversation');
+  const targetPhone = searchParams.get('phone');
   
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [isNewConversationModalOpen, setIsNewConversationModalOpen] = useState(false);
@@ -20,18 +21,37 @@ function ConversationsContent() {
   // Fetch conversations to enable auto-selection
   const { data: conversationsData } = useConversations();
   
-  // Auto-select conversation from URL parameter
+  // Auto-select conversation from URL parameter (by ID or phone number)
   useEffect(() => {
-    if (targetConversationId && conversationsData?.data && !selectedConversation) {
-      const targetConversation = conversationsData.data.find(
-        (conv: Conversation) => conv.id === targetConversationId
-      );
+    if (conversationsData?.data && !selectedConversation) {
+      let targetConversation = null;
+      
+      // Try to find by conversation ID first
+      if (targetConversationId) {
+        targetConversation = conversationsData.data.find(
+          (conv: Conversation) => conv.id === targetConversationId
+        );
+      }
+      
+      // If not found, try to find by phone number
+      if (!targetConversation && targetPhone) {
+        targetConversation = conversationsData.data.find(
+          (conv: Conversation) => {
+            const contactPhone = conv.contact?.phone_number || '';
+            // Remove any non-numeric characters for comparison
+            const normalizedContactPhone = contactPhone.replace(/\D/g, '');
+            const normalizedTargetPhone = targetPhone.replace(/\D/g, '');
+            return normalizedContactPhone.includes(normalizedTargetPhone) || 
+                   normalizedTargetPhone.includes(normalizedContactPhone);
+          }
+        );
+      }
       
       if (targetConversation) {
         setSelectedConversation(targetConversation);
       }
     }
-  }, [targetConversationId, conversationsData, selectedConversation]);
+  }, [targetConversationId, targetPhone, conversationsData, selectedConversation]);
 
   const handleConversationSelect = (conversation: Conversation) => {
     setSelectedConversation(conversation);
