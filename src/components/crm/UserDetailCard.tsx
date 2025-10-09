@@ -1,10 +1,13 @@
 "use client"
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import AIInsightsCard from './AIInsightsCard';
+import { toast } from 'sonner';
 import { 
   User, 
   Building2, 
@@ -82,18 +85,21 @@ const getScoreColor = (score: number) => {
 };
 
 export const UserDetailCard: React.FC<UserDetailCardProps> = ({ user, stats, activity, onBack }) => {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
+  const [isFetchingName, setIsFetchingName] = useState(false);
+  const [contactName, setContactName] = useState(user.name || '');
   const [showFullActivity, setShowFullActivity] = useState(false);
   const leadScore = user.lead_score || 0;
   const scorePercentage = Math.min(leadScore, 100);
 
   const handleSendMessage = () => {
-    // TODO: Implement send message functionality
-    console.log('Send message to:', user.phone_number);
+    // Navigate to conversations page with phone parameter
+    router.push(`/conversations?phone=${user.phone_number}`);
   };
 
   const handleCall = () => {
-    // TODO: Implement call functionality
+    // Open phone dialer
     window.open(`tel:${user.phone_number}`, '_self');
   };
 
@@ -103,8 +109,43 @@ export const UserDetailCard: React.FC<UserDetailCardProps> = ({ user, stats, act
   };
 
   const handleViewChat = () => {
-    // TODO: Navigate to chat view
-    console.log('View chat for:', user.id);
+    // Navigate to conversations page with phone parameter
+    router.push(`/conversations?phone=${user.phone_number}`);
+  };
+
+  const handleFetchName = async () => {
+    setIsFetchingName(true);
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const response = await fetch(`${API_BASE}/api/crm/contact/${user.id}/fetch-name`, {
+        method: 'POST',
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.status === 'success') {
+        setContactName(data.data.name);
+        toast.success(`Contact name fetched: ${data.data.name}`, {
+          description: data.data.verified_name ? `Verified business: ${data.data.verified_name}` : undefined
+        });
+        
+        // Optionally reload the page to refresh all data
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        toast.error('Failed to fetch name', {
+          description: data.message || 'Unable to get contact name from WhatsApp'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching contact name:', error);
+      toast.error('Network error', {
+        description: 'Failed to connect to server'
+      });
+    } finally {
+      setIsFetchingName(false);
+    }
   };
 
   return (
@@ -152,7 +193,31 @@ export const UserDetailCard: React.FC<UserDetailCardProps> = ({ user, stats, act
                   </div>
 
                   {/* Name & Title */}
-                  <h2 className="text-2xl font-bold text-gray-900 mb-1">{user.name || 'Unknown Contact'}</h2>
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <h2 className="text-2xl font-bold text-gray-900">{contactName || 'Unknown Contact'}</h2>
+                    {(!contactName || contactName === 'Unknown Contact') && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={handleFetchName}
+                        disabled={isFetchingName}
+                        className="h-7 px-2 text-xs hover:bg-blue-50 hover:border-blue-300 transition-all"
+                        title="Fetch name from WhatsApp"
+                      >
+                        {isFetchingName ? (
+                          <>
+                            <span className="animate-spin mr-1">⏳</span>
+                            Fetching...
+                          </>
+                        ) : (
+                          <>
+                            <User className="h-3 w-3 mr-1" />
+                            Get Name
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                   <div className="space-y-1 mb-4">
                     {user.position && (
                       <p className="text-gray-600 flex items-center justify-center gap-1">
@@ -259,12 +324,20 @@ export const UserDetailCard: React.FC<UserDetailCardProps> = ({ user, stats, act
             
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
+              <Card 
+                className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100 cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-200"
+                onClick={handleViewChat}
+              >
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-blue-600 text-sm font-medium">Total Messages</p>
-                      <p className="text-3xl font-bold text-blue-900">{stats?.total_messages || 22}</p>
+                      <p className="text-3xl font-bold text-blue-900">
+                        {stats?.total_messages !== undefined ? stats.total_messages : (
+                          <span className="text-lg text-gray-400">No data</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-blue-500 mt-1">Click to view conversation →</p>
                     </div>
                     <MessageCircle className="h-8 w-8 text-blue-600" />
                   </div>
@@ -276,7 +349,11 @@ export const UserDetailCard: React.FC<UserDetailCardProps> = ({ user, stats, act
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-emerald-600 text-sm font-medium">Response Time</p>
-                      <p className="text-3xl font-bold text-emerald-900">{stats?.avg_response_time || '2 hours'}</p>
+                      <p className="text-3xl font-bold text-emerald-900">
+                        {stats?.avg_response_time || (
+                          <span className="text-lg text-gray-400">No data</span>
+                        )}
+                      </p>
                     </div>
                     <Clock className="h-8 w-8 text-emerald-600" />
                   </div>
@@ -288,13 +365,20 @@ export const UserDetailCard: React.FC<UserDetailCardProps> = ({ user, stats, act
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-amber-600 text-sm font-medium">Engagement</p>
-                      <p className="text-3xl font-bold text-amber-900">High</p>
+                      <p className="text-3xl font-bold text-amber-900">
+                        {leadScore >= 60 ? 'High' : leadScore >= 30 ? 'Medium' : leadScore > 0 ? 'Low' : (
+                          <span className="text-lg text-gray-400">New</span>
+                        )}
+                      </p>
                     </div>
                     <Flame className="h-8 w-8 text-amber-600" />
                   </div>
                 </CardContent>
               </Card>
             </div>
+
+            {/* AI Insights Card */}
+            <AIInsightsCard userId={user.id} />
 
             {/* CRM Summary */}
             {user.crm_summary && (
@@ -325,63 +409,47 @@ export const UserDetailCard: React.FC<UserDetailCardProps> = ({ user, stats, act
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {/* Recent Activities */}
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100">
-                      <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
-                        <Calendar className="h-4 w-4 text-green-600" />
+                {activity && activity.length > 0 ? (
+                  <div className="space-y-3">
+                    {activity.slice(0, showFullActivity ? activity.length : 5).map((item, idx) => (
+                      <div key={idx} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition-all duration-200 hover:shadow-sm border border-gray-100">
+                        <div className="h-6 w-6 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <div className="h-2 w-2 bg-indigo-600 rounded-full" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-900 font-medium">{item.description}</p>
+                          <p className="text-xs text-gray-500 mt-1">{new Date(item.date).toLocaleString()}</p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">Discovery Call Invitation</p>
-                        <p className="text-sm text-gray-600">Calendly invitation sent</p>
-                        <p className="text-xs text-gray-500 mt-1">2025-09-13T06:12:39.967968+00:00</p>
+                    ))}
+                    {activity.length > 5 && (
+                      <div className="text-center pt-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setShowFullActivity(!showFullActivity)}
+                          className="text-blue-600 hover:text-blue-700"
+                        >
+                          {showFullActivity ? 'Show Less' : `Show ${activity.length - 5} More Activities`}
+                        </Button>
                       </div>
-                      <Badge className="bg-green-100 text-green-700">Sent</Badge>
-                    </div>
-
-                    <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
-                      <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Award className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">Lead Qualification: Qualified</p>
-                        <p className="text-sm text-gray-600">Lead - Discovery Call Invited</p>
-                        <p className="text-xs text-gray-500 mt-1">2025-09-13T06:12:38.360702+00:00</p>
-                      </div>
-                      <Badge className="bg-blue-100 text-blue-700">Qualified</Badge>
-                    </div>
+                    )}
                   </div>
-
-                  {/* Additional Activity Items */}
-                  {activity && activity.length > 0 && (
-                    <div className="space-y-3 pt-4 border-t border-gray-200">
-                      {activity.slice(0, showFullActivity ? activity.length : 3).map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition-all duration-200 hover:shadow-sm">
-                          <div className="h-6 w-6 bg-gray-100 rounded-full flex items-center justify-center">
-                            <div className="h-2 w-2 bg-gray-400 rounded-full" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm text-gray-900">{item.description}</p>
-                            <p className="text-xs text-gray-500">{item.date}</p>
-                          </div>
-                        </div>
-                      ))}
-                      {activity.length > 3 && (
-                        <div className="text-center pt-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => setShowFullActivity(!showFullActivity)}
-                            className="text-blue-600 hover:text-blue-700"
-                          >
-                            {showFullActivity ? 'Show Less' : `Show ${activity.length - 3} More Activities`}
-                          </Button>
-                        </div>
-                      )}
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                      <Activity className="h-8 w-8 text-gray-400" />
                     </div>
-                  )}
-                </div>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">No Activity Yet</h4>
+                    <p className="text-sm text-gray-500 mb-4">
+                      This contact hasn't had any recorded activities yet.
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-2">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Add First Activity
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

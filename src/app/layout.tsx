@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "sonner";
 import { AuthInitializer } from "@/components/providers/auth-initializer";
 import { AppLayout } from "@/components/layout/app-layout";
 import "./globals.css";
@@ -75,6 +76,7 @@ export default function RootLayout({
             </AppLayout>
           </AuthInitializer>
           <Toaster />
+          <SonnerToaster position="top-right" richColors />
         </QueryProvider>
       </body>
     </html>
