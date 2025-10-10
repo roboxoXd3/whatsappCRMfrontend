@@ -63,6 +63,9 @@ export function ConversationDetail({
 
   const { contact } = conversation;
   
+  // Debug: Log contact information
+  console.log('🔍 Conversation contact:', contact);
+  
   // Fetch conversation details with messages
   const { 
     data: conversationDetail, 
@@ -132,27 +135,39 @@ export function ConversationDetail({
     if (!message.trim() || sendMessageMutation.isPending) return;
     
     try {
-      // Clean phone number format for API
-      const cleanPhone = contact.phone_number.replace('_s_whatsapp_net', '');
+      // IMPORTANT: Use the exact phone number format from the contact in this conversation
+      // Do NOT normalize or modify it - the backend will handle routing correctly
+      const phoneNumber = contact.phone_number
+        .replace('@s.whatsapp.net', '')
+        .replace('_s_whatsapp_net', '')
+        .replace('@c.us', '')
+        .trim();
       
-      console.log('Sending message to:', cleanPhone);
-      console.log('Message content:', message);
+      console.log('📤 Sending message');
+      console.log('   Conversation ID:', conversation.id);
+      console.log('   Phone number:', phoneNumber);
+      console.log('   Message:', message);
       
       const response = await sendMessageMutation.mutateAsync({
-        phone_number: cleanPhone,
+        phone_number: phoneNumber,
         message: message.trim(),
       });
       
       if (response.status === 'success') {
-        // Clear input and refresh conversation
+        // Clear input
         setMessage('');
-        refetch();
-        
-        // Auto-scroll to bottom after sending message
-        setTimeout(() => scrollToBottom(true), 200);
         
         // Show success message
         console.log('Message sent successfully:', response);
+        
+        // Small delay to ensure database consistency before refetching
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Wait for refetch to complete before scrolling
+        await refetch();
+        
+        // Auto-scroll to bottom after messages have loaded
+        setTimeout(() => scrollToBottom(true), 300);
       } else {
         throw new Error(response.message || 'Failed to send message');
       }
@@ -442,46 +457,30 @@ export function ConversationDetail({
         </div>
 
         {/* Message Input - Enhanced mobile responsiveness */}
-        <div className="bg-[#f0f2f5] px-2 py-3 sm:px-3 sm:py-4 lg:p-4 border-t border-gray-200">
-          {/* Quick Action: Request Human Support - More compact on mobile */}
-          {conversation.bot_enabled !== false && (
-            <div className="mb-2 sm:mb-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="text-xs sm:text-sm bg-white border-amber-200 text-amber-700 hover:bg-amber-50 h-8 sm:h-9 lg:h-8 px-2 sm:px-4"
-                onClick={() => setMessage("I need to talk to a human")}
-              >
-                <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Request Human Support</span>
-                <span className="sm:hidden">Human</span>
-              </Button>
-            </div>
-          )}
-          
-          <div className="flex items-center gap-1 sm:gap-2 lg:gap-3 w-full">
+        <div className="bg-[#f0f2f5] px-2 py-2.5 sm:px-3 sm:py-3 lg:p-4 border-t border-gray-200">
+          <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 w-full max-w-full">
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-10 w-10 sm:h-12 sm:w-12 lg:h-10 lg:w-10 text-[#54656f] hover:bg-[#f5f6f6] flex-shrink-0 rounded-full"
+              className="h-9 w-9 sm:h-10 sm:w-10 lg:h-10 lg:w-10 text-[#54656f] hover:bg-[#f5f6f6] flex-shrink-0 rounded-full"
             >
-              <Paperclip className="h-4 w-4 sm:h-6 sm:w-6 lg:h-5 lg:w-5" />
+              <Paperclip className="h-4 w-4 sm:h-5 sm:w-5 lg:h-5 lg:w-5" />
             </Button>
             
-            <div className="flex-1 flex items-center bg-white rounded-2xl border border-gray-200 min-h-[40px] sm:min-h-[48px] lg:min-h-[40px] overflow-hidden">
+            <div className="flex-1 flex items-center bg-white rounded-2xl border border-gray-200 min-h-[40px] sm:min-h-[44px] lg:min-h-[40px] overflow-hidden min-w-0">
               <Input
                 placeholder="Type a message"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent text-sm sm:text-base lg:text-sm h-10 sm:h-12 lg:h-10 px-3 sm:px-4"
+                className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent text-sm sm:text-base lg:text-sm h-9 sm:h-11 lg:h-9 px-3 sm:px-4 min-w-0"
                 disabled={sendMessageMutation.isPending}
               />
               
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-8 w-8 sm:h-10 sm:w-10 lg:h-8 lg:w-8 text-[#54656f] hover:bg-[#f5f6f6] flex-shrink-0 rounded-full mr-1"
+                className="h-7 w-7 sm:h-9 sm:w-9 lg:h-8 lg:w-8 text-[#54656f] hover:bg-[#f5f6f6] flex-shrink-0 rounded-full mr-1 sm:mr-1.5"
               >
                 <Smile className="h-4 w-4 sm:h-5 sm:w-5 lg:h-4 lg:w-4" />
               </Button>
@@ -491,12 +490,12 @@ export function ConversationDetail({
               onClick={handleSendMessage}
               disabled={!message.trim() || sendMessageMutation.isPending}
               size="icon"
-              className="h-10 w-10 sm:h-12 sm:w-12 lg:h-10 lg:w-10 bg-[#00a884] hover:bg-[#00a884]/90 text-white flex-shrink-0 rounded-full"
+              className="h-9 w-9 sm:h-10 sm:w-10 lg:h-10 lg:w-10 bg-[#00a884] hover:bg-[#00a884]/90 text-white flex-shrink-0 rounded-full"
             >
               {sendMessageMutation.isPending ? (
-                <Loader2 className="h-4 w-4 sm:h-6 sm:w-6 lg:h-4 lg:w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 lg:h-4 lg:w-4 animate-spin" />
               ) : (
-                <Send className="h-4 w-4 sm:h-6 sm:w-6 lg:h-4 lg:w-4" />
+                <Send className="h-4 w-4 sm:h-5 sm:w-5 lg:h-4 lg:w-4" />
               )}
             </Button>
           </div>

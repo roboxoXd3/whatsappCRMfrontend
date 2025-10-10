@@ -105,7 +105,7 @@ function ConversationsContent() {
   };
 
   return (
-    <div className="flex h-screen bg-[#f0f2f5] overflow-hidden">
+    <div className="flex h-full bg-[#f0f2f5] overflow-hidden pb-16 lg:pb-0">
       {/* Mobile: Full screen conversation list or chat */}
       {/* Desktop: Side-by-side layout */}
       
