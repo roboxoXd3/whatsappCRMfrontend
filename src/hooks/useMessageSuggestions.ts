@@ -96,6 +96,10 @@ export function useMessageSuggestions(
           requestData
         );
 
+        if (!response.data) {
+          throw new Error('No suggestions data received');
+        }
+
         return response.data;
       } catch (error) {
         console.error('Error fetching message suggestions:', error);
@@ -140,6 +144,10 @@ export function useRefreshSuggestions() {
           requestData
         );
 
+        if (!response.data) {
+          throw new Error('No suggestions data received');
+        }
+
         return response;
       } catch (error) {
         console.error('Error refreshing message suggestions:', error);
@@ -152,7 +160,9 @@ export function useRefreshSuggestions() {
         ? messageSuggestionKeys.contactWithTenant(variables.userId, variables.tenantId)
         : messageSuggestionKeys.contact(variables.userId);
       
-      queryClient.setQueryData(queryKey, response.data);
+      if (response.data) {
+        queryClient.setQueryData(queryKey, response.data);
+      }
     },
   });
 }
@@ -190,6 +200,10 @@ export function useEnhanceMessage() {
           `/api/crm/contact/${userId}/enhance-message`,
           requestData
         );
+
+        if (!response.data) {
+          throw new Error('No enhancement data received');
+        }
 
         return response.data;
       } catch (error) {

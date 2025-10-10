@@ -192,9 +192,9 @@ export const SendMessageModal: React.FC<SendMessageModalProps> = ({
                   <MessageCircle className="h-4 w-4 text-blue-600" />
                   <span className="font-medium text-sm text-blue-900">
                     Conversation Context
-                    {summaryData?.message_count > 0 && (
+                    {(summaryData?.message_count ?? 0) > 0 && (
                       <span className="ml-2 text-xs text-blue-600">
-                        ({summaryData.message_count} messages)
+                        ({summaryData?.message_count} messages)
                       </span>
                     )}
                   </span>
