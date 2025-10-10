@@ -64,15 +64,6 @@ export function useContact(contactId: string) {
   });
 }
 
-export function useSearchContacts(query: string, pagination: PaginationParams = {}) {
-  return useQuery({
-    queryKey: ['crm', 'contacts', 'search', query, pagination],
-    queryFn: () => crmApi.contacts.searchContacts(query, pagination),
-    enabled: query.length > 0,
-    staleTime: 10000, // 10 seconds for search results
-  });
-}
-
 export function useCreateContact() {
   const queryClient = useQueryClient();
   
@@ -318,8 +309,13 @@ export function useCRMStats() {
     const deals = dealsData;
     const tasks = tasksData;
 
+    // Get total counts from pagination metadata
+    const pagination = (contactsQuery.data as any)?.pagination;
+    const totalAllContacts = pagination?.total_all_contacts;
+    const totalUniqueContacts = pagination?.total_unique_contacts || contacts.length;
+
     // Calculate contact stats
-    const totalContacts = contacts.length;
+    const totalContacts = totalUniqueContacts; // Use unique count as primary
     const totalLeads = contacts.filter(c => c.lead_status === 'new' || c.lead_status === 'contacted' || c.lead_status === 'qualified').length;
     const totalCustomers = contacts.filter(c => c.lead_status === 'qualified' || c.lead_status === 'negotiation').length;
 
@@ -342,6 +338,7 @@ export function useCRMStats() {
 
     const stats = {
       total_contacts: totalContacts,
+      total_all_contacts: totalAllContacts, // Include total with duplicates
       total_leads: totalLeads,
       total_customers: totalCustomers,
       total_deals: openDeals, // Show open deals as "active deals"

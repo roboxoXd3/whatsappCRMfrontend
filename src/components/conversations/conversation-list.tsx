@@ -188,10 +188,8 @@ export function ConversationList({
         key={conversation.id}
         onClick={() => handleConversationClick(conversation)}
         className={cn(
-          "flex items-center gap-3 p-4 lg:p-3 hover:bg-gray-50 cursor-pointer transition-all duration-200",
-          "border-l-4 border-transparent hover:border-blue-300 touch-target",
-          "min-h-[72px] lg:min-h-[60px]", // Larger touch targets on mobile
-          isSelected && "bg-blue-50 border-l-blue-500 shadow-sm"
+          "flex items-center gap-3 px-4 py-3 hover:bg-[#f5f6f6] cursor-pointer transition-colors duration-150 border-b border-[#e9edef]",
+          isSelected && "bg-[#f0f2f5]"
         )}
         style={{
           transform: `translateY(${index * 0.5}px)`,
@@ -199,69 +197,65 @@ export function ConversationList({
         }}
       >
         {/* Avatar */}
-        <div className="relative">
-          <Avatar className="w-14 h-14 lg:w-12 lg:h-12 ring-2 ring-white shadow-sm">
+        <div className="relative flex-shrink-0">
+          <Avatar className="w-[49px] h-[49px]">
             {conversation.contact.profile_image_url ? (
               <img 
                 src={conversation.contact.profile_image_url} 
                 alt={displayName}
-                className="w-full h-full object-cover rounded-full"
+                className="w-full h-full object-cover"
               />
             ) : (
-              <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium text-lg lg:text-base">
+              <AvatarFallback className="bg-[#dfe5e7] text-[#54656f] font-normal text-base">
                 {getInitials(displayName)}
               </AvatarFallback>
             )}
           </Avatar>
           
-          {/* Status indicators */}
-          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-          
           {/* Message type indicator */}
           {conversation.last_message_role === 'assistant' && (
-            <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs">🤖</span>
+            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-[#25d366] rounded-full flex items-center justify-center border-2 border-white">
+              <span className="text-[10px]">✓</span>
             </div>
           )}
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1">
-            <h4 className="font-medium text-gray-900 truncate text-base lg:text-sm">
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="flex items-baseline justify-between mb-0.5">
+            <h4 className="font-medium text-[#111b21] truncate text-[16px]">
               {displayName}
             </h4>
-            <div className="flex items-center gap-2">
-              <span className="text-sm lg:text-xs text-gray-500 flex-shrink-0">
+            <div className="flex items-center gap-1.5 ml-2">
+              <span className="text-[12px] text-[#667781] flex-shrink-0">
                 {formatTime(conversation.last_message_at)}
               </span>
-              {conversation.unread_count && conversation.unread_count > 0 && (
-                <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs rounded-full min-w-[22px] lg:min-w-[20px] h-6 lg:h-5 flex items-center justify-center animate-pulse">
-                  {conversation.unread_count}
-                </Badge>
+              {conversation.bot_enabled === false && (
+                <div className="w-1.5 h-1.5 bg-orange-400 rounded-full flex-shrink-0" title="Bot disabled" />
+              )}
+              {conversation.handover_requested && (
+                <div className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse flex-shrink-0" title="Human support requested" />
               )}
             </div>
           </div>
           
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
               {conversation.last_message_role === 'assistant' && (
-                <span className="text-blue-500 text-sm lg:text-xs">✓</span>
+                <svg viewBox="0 0 16 15" className="w-4 h-4 text-[#53bdeb] flex-shrink-0" fill="currentColor">
+                  <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
+                </svg>
               )}
-              <p className="text-sm lg:text-sm text-gray-600 truncate leading-relaxed">
+              <p className="text-[14px] text-[#667781] truncate">
                 {conversation.last_message_preview || 'No messages yet'}
               </p>
             </div>
             
-            {/* Conversation status badges */}
-            <div className="flex gap-1 ml-2">
-              {conversation.bot_enabled === false && (
-                <div className="w-3 h-3 lg:w-2 lg:h-2 bg-orange-400 rounded-full" title="Bot disabled" />
-              )}
-              {conversation.handover_requested && (
-                <div className="w-3 h-3 lg:w-2 lg:h-2 bg-red-400 rounded-full animate-pulse" title="Human support requested" />
-              )}
-            </div>
+            {conversation.unread_count && conversation.unread_count > 0 && (
+              <div className="bg-[#25d366] text-white text-[12px] font-medium rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center flex-shrink-0">
+                {conversation.unread_count}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -325,7 +319,7 @@ export function ConversationList({
     }
 
     return (
-      <div className="divide-y divide-gray-100">
+      <div className="bg-white">
         {conversations.map((conversation, index) => renderConversationItem(conversation, index))}
       </div>
     );
@@ -333,24 +327,24 @@ export function ConversationList({
 
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Enhanced Search Bar */}
-      <div className="p-4 lg:p-3 border-b border-gray-200 bg-white">
-        <div className="space-y-3">
+      {/* Search Bar */}
+      <div className="p-3 bg-[#f0f2f5]">
+        <div className="space-y-2.5">
           {/* Search Input */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 lg:h-4 lg:w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
             <Input
-              placeholder="Search conversations..."
+              placeholder="Search or start new chat"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-11 lg:pl-10 pr-10 bg-gray-50 border-gray-200 rounded-lg focus:bg-white transition-colors h-12 lg:h-10 text-base lg:text-sm"
+              className="pl-10 pr-9 bg-white border-0 rounded-lg shadow-sm h-[38px] text-[14px] placeholder:text-gray-500 focus-visible:ring-1 focus-visible:ring-[#008069] focus-visible:ring-offset-0"
             />
             {searchQuery && (
               <button
                 onClick={clearSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
               >
-                <X className="h-5 w-5 lg:h-4 lg:w-4" />
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>

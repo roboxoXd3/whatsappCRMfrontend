@@ -35,7 +35,8 @@ import FloatingLeadAnalysis from './floating-lead-analysis';
 interface ConversationDetailProps {
   conversation: Conversation;
   onBack?: () => void;
-  onToggleContactInfo?: () => void;
+  onOpenContactInfo?: () => void;
+  onCloseContactInfo?: () => void;
   showContactInfo?: boolean;
   onToggleLeadAnalysis?: () => void;
   showLeadAnalysis?: boolean;
@@ -45,7 +46,8 @@ interface ConversationDetailProps {
 export function ConversationDetail({ 
   conversation, 
   onBack,
-  onToggleContactInfo,
+  onOpenContactInfo,
+  onCloseContactInfo,
   showContactInfo,
   onToggleLeadAnalysis,
   showLeadAnalysis,
@@ -168,7 +170,15 @@ export function ConversationDetail({
   };
 
   return (
-    <div className={cn("flex h-full bg-white", className)}>
+    <div 
+      className={cn("relative flex h-full bg-white overflow-hidden", className)}
+      onClick={(e) => {
+        // Prevent any stray clicks from propagating
+        if (e.target === e.currentTarget) {
+          e.stopPropagation();
+        }
+      }}
+    >
       {/* Floating Lead Analysis - Fixed positioning for better UX */}
       {showLeadAnalysis && (
         <FloatingLeadAnalysis
@@ -184,8 +194,11 @@ export function ConversationDetail({
         />
       )}
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      {/* Main Chat Area - Width adjusts when contact info is shown on desktop */}
+      <div className={cn(
+        "flex-1 flex flex-col transition-all duration-300 ease-out",
+        showContactInfo && !showLeadAnalysis && "lg:mr-[400px] xl:mr-[420px]"
+      )}>
         {/* Chat Header - Enhanced mobile responsiveness */}
         <div className="bg-[#f0f2f5] border-b border-gray-200 px-2 py-2 sm:px-3 sm:py-3 lg:px-4 lg:py-3">
           <div className="flex items-center justify-between">
@@ -200,7 +213,15 @@ export function ConversationDetail({
                 <ArrowLeft className="h-5 w-5 sm:h-6 sm:w-6" />
               </Button>
             )}
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div 
+              className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 cursor-pointer hover:bg-[#f5f6f6] -mx-2 px-2 py-1 rounded-lg transition-colors"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Contact name clicked - opening contact info');
+                onOpenContactInfo?.();
+              }}
+            >
               <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gray-300 flex items-center justify-center text-sm sm:text-lg font-medium text-gray-600 overflow-hidden flex-shrink-0">
                 {contact.profile_image_url ? (
                   <img 
@@ -290,15 +311,6 @@ export function ConversationDetail({
             <Button variant="ghost" size="icon" className="hidden sm:flex h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="Video Call">
               <Video className="h-5 w-5" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="h-8 w-8 sm:h-10 sm:w-10 text-[#54656f] hover:bg-[#f5f6f6]"
-              title="Show Customer Info"
-              onClick={onToggleContactInfo}
-            >
-              <Info className="h-3 w-3 sm:h-5 sm:w-5" />
-            </Button>
             <Button variant="ghost" size="icon" className="hidden sm:flex h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="More">
               <MoreVertical className="h-5 w-5" />
                           </Button>
@@ -365,9 +377,9 @@ export function ConversationDetail({
         <div 
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="relative flex-1 px-1 py-2 sm:px-2 sm:py-4 lg:p-4 overflow-y-auto bg-[#efeae2] scrollbar-thin" 
+          className="relative flex-1 px-2 py-2 sm:px-4 sm:py-4 lg:p-4 overflow-y-auto overflow-x-hidden bg-[#efeae2] scrollbar-thin" 
           style={{backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxwYXR0ZXJuIGlkPSJhIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgcGF0dGVyblRyYW5zZm9ybT0icm90YXRlKDEyKSI+CiAgICAgIDxwYXRoIGQ9Im0wIDBoMzAwdjMwMGgtMzAweiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMDIiLz4KICAgIDwvcGF0dGVybj4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNhKSIvPgo8L3N2Zz4=')"}}>
-          <div className="w-full max-w-full sm:max-w-4xl lg:max-w-4xl lg:mx-auto space-y-2 sm:space-y-3 lg:space-y-2">
+          <div className="w-full max-w-[calc(100vw-1rem)] sm:max-w-4xl lg:max-w-4xl lg:mx-auto space-y-2 sm:space-y-3 lg:space-y-2">
             {isLoading ? (
               <div className="text-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
@@ -501,14 +513,47 @@ export function ConversationDetail({
         </div>
       </div>
 
-      {/* Contact Info Sidebar - Only show if Lead Analysis is not active */}
+      {/* Contact Info Sidebar - Slides in from right (WhatsApp style) */}
       {showContactInfo && !showLeadAnalysis && (
         <>
-          <div className="w-px bg-gray-200"></div>
-          <ContactInfoPanel 
-            conversation={conversation}
-            onClose={() => onToggleContactInfo?.()}
+          {/* Mobile Backdrop */}
+          <div 
+            className="lg:hidden fixed inset-0 bg-black/50 z-40"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('Mobile backdrop clicked - closing');
+              onCloseContactInfo?.();
+            }}
           />
+          
+          {/* Contact Info Panel - Fixed positioning to avoid parent overflow clipping */}
+          <div 
+            className={cn(
+              // Use fixed positioning for both mobile and desktop to avoid overflow-hidden clipping
+              "fixed top-0 right-0 bottom-0 z-50",
+              // Width: Full on mobile, fixed on desktop
+              "w-full lg:w-[400px] xl:w-[420px]",
+              // Styling
+              "bg-white shadow-2xl",
+              // Animation - slide in from right
+              "transition-transform duration-300 ease-out",
+              showContactInfo ? "translate-x-0" : "translate-x-full"
+            )}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('Contact panel clicked - preventing propagation');
+            }}
+          >
+            <ContactInfoPanel 
+              conversation={conversation}
+              onClose={() => {
+                console.log('Close button clicked - closing contact info');
+                onCloseContactInfo?.();
+              }}
+            />
+          </div>
         </>
       )}
     </div>

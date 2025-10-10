@@ -57,19 +57,6 @@ export const contactsApi = {
   deleteContact: async (contactId: string): Promise<ApiResponse<{ message: string }>> => {
     return await apiClient.delete<{ message: string }>(`/api/crm/contact/${contactId}`);
   },
-
-  // Search contacts
-  searchContacts: async (
-    query: string,
-    pagination: PaginationParams = {}
-  ): Promise<ApiResponse<Contact[]>> => {
-    const params = new URLSearchParams();
-    params.append('q', query);
-    if (pagination.limit) params.append('limit', pagination.limit.toString());
-    if (pagination.offset) params.append('offset', pagination.offset.toString());
-
-    return await apiClient.get<Contact[]>(`/api/crm/contacts/search?${params.toString()}`);
-  },
 };
 
 // Deals API

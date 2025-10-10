@@ -45,7 +45,7 @@ export function MessageBubble({
 
   return (
     <div className={cn(
-      "flex gap-2 sm:gap-3 w-full group px-1 sm:px-0",
+      "flex gap-2 sm:gap-3 w-full group",
       (isUser || isHuman) ? "flex-row-reverse" : "flex-row",
       className
     )}>
@@ -65,7 +65,7 @@ export function MessageBubble({
 
       {/* Message Content */}
       <div className={cn(
-        "flex-1 min-w-0 max-w-[calc(100%-2.5rem)]", // Ensure content doesn't overflow
+        "flex-1 min-w-0", // Allow flex to manage width
         (isUser || isHuman) ? "items-end" : "items-start"
       )}>
         {/* Header with sender info and timestamp - More compact on mobile */}
@@ -106,7 +106,7 @@ export function MessageBubble({
         {/* Message bubble - Improved mobile responsiveness */}
         <div className={cn(
           "rounded-lg px-3 py-2 sm:px-4 sm:py-3 relative",
-          "max-w-[95%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-2xl", // Progressive width constraints
+          "max-w-[280px] sm:max-w-[85%] md:max-w-[75%] lg:max-w-2xl", // Progressive width constraints
           "min-w-[80px] sm:min-w-[100px]", // Responsive minimum width
           "break-words overflow-wrap-anywhere", // Better word breaking
           "shadow-sm", // Subtle shadow for better definition

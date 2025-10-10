@@ -59,13 +59,40 @@ export function ContactsList({ className }: ContactsListProps) {
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const router = useRouter();
 
+  // Fetch all contacts once (client-side filtering for better performance)
   const { data: contactsResponse, isLoading, error } = useContacts({
-    search: searchQuery || undefined,
-    status: statusFilter !== 'all' ? statusFilter as any : undefined,
-    limit: 50,
+    limit: 1000, // Fetch all contacts
   });
 
-  const contacts = contactsResponse?.data || [];
+  const allContacts = contactsResponse?.data || [];
+
+  // Client-side filtering for instant search
+  const contacts = React.useMemo(() => {
+    let filtered = allContacts;
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(contact => contact.lead_status === statusFilter);
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(contact => {
+        const name = (contact.name || '').toLowerCase();
+        const phone = (contact.phone_number || '').toLowerCase();
+        const email = (contact.email || '').toLowerCase();
+        const company = (contact.company || '').toLowerCase();
+        
+        return name.includes(query) || 
+               phone.includes(query) || 
+               email.includes(query) || 
+               company.includes(query);
+      });
+    }
+
+    return filtered;
+  }, [allContacts, searchQuery, statusFilter]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -206,44 +233,53 @@ export function ContactsList({ className }: ContactsListProps) {
           />
 
           {/* Search and Filters */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search contacts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+          <div className="space-y-2 mb-6">
+            <div className="flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search contacts by name, phone, email, or company..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <Filter className="h-4 w-4 mr-2" />
+                    Status: {statusFilter === 'all' ? 'All' : statusFilter}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => setStatusFilter('all')}>
+                    All Contacts
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter('new')}>
+                    New Leads
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter('contacted')}>
+                    Contacted
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter('qualified')}>
+                    Qualified
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter('negotiation')}>
+                    Negotiation
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter('lost')}>
+                    Lost
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Status: {statusFilter === 'all' ? 'All' : statusFilter}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setStatusFilter('all')}>
-                  All Contacts
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('new')}>
-                  New Leads
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('contacted')}>
-                  Contacted
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('qualified')}>
-                  Qualified
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('negotiation')}>
-                  Negotiation
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('lost')}>
-                  Lost
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Results count */}
+            {(searchQuery || statusFilter !== 'all') && (
+              <p className="text-sm text-muted-foreground">
+                Showing {contacts.length} of {allContacts.length} contacts
+                {searchQuery && ` matching "${searchQuery}"`}
+              </p>
+            )}
           </div>
 
           {/* Contacts Table */}

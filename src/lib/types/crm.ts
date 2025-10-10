@@ -189,6 +189,7 @@ export interface UpdateTaskRequest {
 // CRM Statistics
 export interface CRMStats {
   total_contacts: number;
+  total_all_contacts?: number; // Total including duplicates
   total_leads: number;
   total_customers: number;
   total_deals: number;

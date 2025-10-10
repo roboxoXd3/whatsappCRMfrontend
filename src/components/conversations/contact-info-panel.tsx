@@ -50,13 +50,20 @@ export function ContactInfoPanel({ conversation, onClose }: ContactInfoPanelProp
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-[#f0f2f5]">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Contact Info</h2>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-5 w-5" />
+      <div className="p-4 bg-[#008069] lg:bg-white flex items-center gap-4 shadow-sm">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={onClose} 
+          className="lg:ml-auto lg:order-2 hover:bg-white/10 lg:hover:bg-gray-100"
+        >
+          <X className="h-6 w-6 text-white lg:text-[#54656f]" />
         </Button>
+        <h2 className="text-[19px] lg:text-[16px] font-medium text-white lg:text-[#111b21] lg:order-1">
+          Contact info
+        </h2>
       </div>
 
       {/* Scrollable Content */}

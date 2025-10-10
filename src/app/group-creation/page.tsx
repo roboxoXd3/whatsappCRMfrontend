@@ -215,7 +215,8 @@ export default function GroupCreationPage() {
 
       const response = await fetch(`${API_BASE}/api/group-messaging/contacts/force-sync`, {
         method: 'POST',
-        headers
+        headers,
+        body: JSON.stringify({})  // Send empty JSON body
       });
       const data = await response.json();
 

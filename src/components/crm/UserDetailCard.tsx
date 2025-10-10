@@ -1,12 +1,12 @@
 "use client"
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import AIInsightsCard from './AIInsightsCard';
+import { SendMessageModal } from './SendMessageModal';
 import { toast } from 'sonner';
 import { 
   User, 
@@ -24,7 +24,6 @@ import {
   MapPin,
   Clock,
   Target,
-  Zap,
   BarChart3,
   Users,
   DollarSign,
@@ -32,7 +31,6 @@ import {
   Flame,
   CheckCircle2,
   AlertCircle,
-  ExternalLink,
 } from 'lucide-react';
 
 interface UserDetailCardProps {
@@ -85,32 +83,17 @@ const getScoreColor = (score: number) => {
 };
 
 export const UserDetailCard: React.FC<UserDetailCardProps> = ({ user, stats, activity, onBack }) => {
-  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isFetchingName, setIsFetchingName] = useState(false);
   const [contactName, setContactName] = useState(user.name || '');
   const [showFullActivity, setShowFullActivity] = useState(false);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const leadScore = user.lead_score || 0;
   const scorePercentage = Math.min(leadScore, 100);
 
   const handleSendMessage = () => {
-    // Navigate to conversations page with phone parameter
-    router.push(`/conversations?phone=${user.phone_number}`);
-  };
-
-  const handleCall = () => {
-    // Open phone dialer
-    window.open(`tel:${user.phone_number}`, '_self');
-  };
-
-  const handleSchedule = () => {
-    // TODO: Implement schedule functionality
-    console.log('Schedule meeting with:', user.name);
-  };
-
-  const handleViewChat = () => {
-    // Navigate to conversations page with phone parameter
-    router.push(`/conversations?phone=${user.phone_number}`);
+    // Open the message modal instead of navigating
+    setIsMessageModalOpen(true);
   };
 
   const handleFetchName = async () => {
@@ -325,8 +308,7 @@ export const UserDetailCard: React.FC<UserDetailCardProps> = ({ user, stats, act
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card 
-                className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100 cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-200"
-                onClick={handleViewChat}
+                className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100"
               >
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -337,7 +319,6 @@ export const UserDetailCard: React.FC<UserDetailCardProps> = ({ user, stats, act
                           <span className="text-lg text-gray-400">No data</span>
                         )}
                       </p>
-                      <p className="text-xs text-blue-500 mt-1">Click to view conversation →</p>
                     </div>
                     <MessageCircle className="h-8 w-8 text-blue-600" />
                   </div>
@@ -452,55 +433,18 @@ export const UserDetailCard: React.FC<UserDetailCardProps> = ({ user, stats, act
                 )}
               </CardContent>
             </Card>
-
-            {/* Quick Actions */}
-            <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm">
-              <CardHeader>
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-yellow-600" />
-                  Quick Actions
-                </h3>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={handleSendMessage}
-                    className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-blue-50 hover:border-blue-200 transition-all duration-200 hover:shadow-md"
-                  >
-                    <MessageCircle className="h-5 w-5 text-blue-600" />
-                    <span className="text-sm">Send Message</span>
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={handleCall}
-                    className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-green-50 hover:border-green-200 transition-all duration-200 hover:shadow-md"
-                  >
-                    <Phone className="h-5 w-5 text-green-600" />
-                    <span className="text-sm">Call</span>
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={handleSchedule}
-                    className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-purple-50 hover:border-purple-200 transition-all duration-200 hover:shadow-md"
-                  >
-                    <Calendar className="h-5 w-5 text-purple-600" />
-                    <span className="text-sm">Schedule</span>
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={handleViewChat}
-                    className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-amber-50 hover:border-amber-200 transition-all duration-200 hover:shadow-md"
-                  >
-                    <ExternalLink className="h-5 w-5 text-amber-600" />
-                    <span className="text-sm">View Chat</span>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
+
+      {/* Send Message Modal */}
+      <SendMessageModal
+        isOpen={isMessageModalOpen}
+        onClose={() => setIsMessageModalOpen(false)}
+        phoneNumber={user.phone_number}
+        contactName={contactName || user.name || 'Unknown Contact'}
+        userId={user.id}
+      />
     </div>
   );
 }; 

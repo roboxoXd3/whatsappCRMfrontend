@@ -64,10 +64,23 @@ export default function CRMPage() {
           <CardContent>
             <div className="text-2xl font-bold">
               {statsLoading ? '...' : formatNumber(stats?.total_contacts || 0)}
+              {!statsLoading && stats?.total_all_contacts && stats.total_all_contacts !== stats.total_contacts && (
+                <span 
+                  className="text-sm font-normal" 
+                  style={{ color: 'var(--muted-foreground)' }}
+                  title={`${stats.total_contacts} unique phone numbers, ${stats.total_all_contacts} total records`}
+                >
+                  {' '}({formatNumber(stats.total_all_contacts)} total)
+                </span>
+              )}
             </div>
             <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-              {statsLoading ? '...' : formatNumber(stats?.total_leads || 0)} leads, {' '}
-              {statsLoading ? '...' : formatNumber(stats?.total_customers || 0)} customers
+              {!statsLoading && stats?.total_all_contacts && stats.total_all_contacts !== stats.total_contacts ? (
+                <>Unique contacts • {formatNumber(stats?.total_leads || 0)} leads, {formatNumber(stats?.total_customers || 0)} customers</>
+              ) : (
+                <>{statsLoading ? '...' : formatNumber(stats?.total_leads || 0)} leads, {' '}
+                {statsLoading ? '...' : formatNumber(stats?.total_customers || 0)} customers</>
+              )}
             </p>
           </CardContent>
         </Card>
