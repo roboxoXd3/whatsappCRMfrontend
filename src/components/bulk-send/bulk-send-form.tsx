@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Send, Users, Upload, FileText, Plus, X, CheckCircle, AlertCircle, Clock, FileCheck, AlertTriangle, Sparkles } from 'lucide-react';
+import { Send, Users, Upload, FileText, Plus, X, CheckCircle, AlertCircle, Clock, FileCheck, AlertTriangle, Sparkles, RefreshCw } from 'lucide-react';
 import Papa from 'papaparse';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAuthStore } from '@/lib/stores/auth';
 
 interface Contact {
@@ -39,6 +40,13 @@ export function BulkSendForm() {
   const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0, successful: 0, failed: 0 });
   const [isStopping, setIsStopping] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // CRM import state
+  const [crmContacts, setCrmContacts] = useState<Contact[]>([]);
+  const [crmSearchQuery, setCrmSearchQuery] = useState('');
+  const [selectedCrmContactIds, setSelectedCrmContactIds] = useState<Set<string>>(new Set());
+  const [isFetchingCrmContacts, setIsFetchingCrmContacts] = useState(false);
+  const [crmFetchError, setCrmFetchError] = useState<string | null>(null);
 
   const handleAddContact = () => {
     if (contactInput.trim()) {
@@ -85,15 +93,49 @@ export function BulkSendForm() {
     setCsvErrors([]);
 
     try {
-      // Parse CSV file
+      // First, parse CSV locally to show contacts immediately
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => {
+        complete: async (results) => {
           const contacts = parseCsvContacts(results.data as any[]);
           if (contacts.length > 0) {
+            // Add contacts to selected list immediately
             setSelectedContacts(prev => [...prev, ...contacts]);
-            setCsvUploadStatus('success');
+            
+            // Then upload to backend to save in database
+            try {
+              const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+              const formData = new FormData();
+              formData.append('file', file);
+
+              const response = await fetch(`${baseURL}/api/bulk-send/import-contacts`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: formData,
+              });
+
+              const result = await response.json();
+
+              if (response.ok && result.status === 'success') {
+                setCsvUploadStatus('success');
+                console.log(`✅ ${result.data.successfully_imported} contacts saved to CRM`);
+                
+                // Show any errors from backend
+                if (result.data.errors && result.data.errors.length > 0) {
+                  setCsvErrors(result.data.errors);
+                }
+              } else {
+                setCsvUploadStatus('error');
+                setCsvErrors([result.message || 'Failed to save contacts to CRM']);
+              }
+            } catch (uploadError) {
+              console.error('Error uploading to backend:', uploadError);
+              setCsvUploadStatus('error');
+              setCsvErrors(['Contacts added to list but failed to save to CRM. They will be saved when you send messages.']);
+            }
           } else {
             setCsvUploadStatus('error');
             setCsvErrors(['No valid contacts found in CSV file']);
@@ -321,6 +363,95 @@ export function BulkSendForm() {
       }, 0);
     }
   };
+
+  // Fetch CRM contacts
+  const fetchCrmContacts = async () => {
+    setIsFetchingCrmContacts(true);
+    setCrmFetchError(null);
+    
+    try {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const response = await fetch(`${baseURL}/api/crm/contacts?limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.status === 'success') {
+        setCrmContacts(data.data || []);
+      } else {
+        setCrmFetchError(data.message || 'Failed to fetch CRM contacts');
+      }
+    } catch (error) {
+      console.error('Error fetching CRM contacts:', error);
+      setCrmFetchError('Failed to load contacts. Please try again.');
+    } finally {
+      setIsFetchingCrmContacts(false);
+    }
+  };
+
+  // Toggle CRM contact selection
+  const toggleCrmContact = (contactId: string) => {
+    setSelectedCrmContactIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(contactId)) {
+        newSet.delete(contactId);
+      } else {
+        newSet.add(contactId);
+      }
+      return newSet;
+    });
+  };
+
+  // Check if contact is already in selected list (by phone number)
+  const isContactAlreadyAdded = (phoneNumber: string): boolean => {
+    return selectedContacts.some(c => c.phone === phoneNumber);
+  };
+
+  // Import selected contacts from CRM
+  const handleImportFromCRM = () => {
+    const contactsToImport = crmContacts
+      .filter(c => selectedCrmContactIds.has(c.id))
+      .map(c => ({
+        id: c.id,
+        name: c.name || c.phone_number,
+        phone: c.phone_number,
+        email: c.email || '',
+        company: c.company || ''
+      }));
+    
+    // Filter out duplicates
+    const newContacts = contactsToImport.filter(c => !isContactAlreadyAdded(c.phone));
+    const duplicateCount = contactsToImport.length - newContacts.length;
+    
+    if (newContacts.length > 0) {
+      setSelectedContacts(prev => [...prev, ...newContacts]);
+    }
+    
+    // Clear selection
+    setSelectedCrmContactIds(new Set());
+    
+    // Show feedback
+    if (duplicateCount > 0) {
+      alert(`Imported ${newContacts.length} contacts. ${duplicateCount} duplicate(s) skipped.`);
+    } else {
+      console.log(`✅ Imported ${newContacts.length} contacts from CRM`);
+    }
+  };
+
+  // Filter CRM contacts by search query
+  const filteredCrmContacts = crmContacts.filter(contact => {
+    if (!crmSearchQuery.trim()) return true;
+    const query = crmSearchQuery.toLowerCase();
+    return (
+      (contact.name || '').toLowerCase().includes(query) ||
+      (contact.phone_number || '').toLowerCase().includes(query) ||
+      (contact.email || '').toLowerCase().includes(query) ||
+      (contact.company || '').toLowerCase().includes(query)
+    );
+  });
 
   const handleStopSending = async () => {
     if (!activeCampaignId) return;
@@ -579,9 +710,14 @@ export function BulkSendForm() {
           </div>
 
           <Tabs defaultValue="manual" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="manual">Manual Entry</TabsTrigger>
               <TabsTrigger value="import">Import File</TabsTrigger>
+              <TabsTrigger value="crm" onClick={() => {
+                if (crmContacts.length === 0 && !isFetchingCrmContacts) {
+                  fetchCrmContacts();
+                }
+              }}>From CRM</TabsTrigger>
             </TabsList>
 
             <TabsContent value="manual" className="space-y-4">
@@ -693,15 +829,153 @@ export function BulkSendForm() {
               </div>
               
               {csvUploadStatus === 'success' && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-blue-800 mb-2">CSV Format Guidelines</h4>
-                  <ul className="text-xs text-blue-700 space-y-1">
-                    <li>• Required: Phone number column (phone, mobile, whatsapp, etc.)</li>
-                    <li>• Optional: Name, email, company columns</li>
-                    <li>• Phone numbers should include country code</li>
-                    <li>• Duplicate numbers will be automatically filtered</li>
-                  </ul>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <h4 className="text-sm font-medium text-green-800">Contacts Saved to CRM</h4>
+                  </div>
+                  <p className="text-xs text-green-600">
+                    Your contacts have been saved to the CRM and are ready to use. You can view them in the CRM page or send messages now.
+                  </p>
                 </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="crm" className="space-y-4">
+              {/* Header with search and refresh */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Search contacts by name, phone, email, or company..."
+                    value={crmSearchQuery}
+                    onChange={(e) => setCrmSearchQuery(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={fetchCrmContacts}
+                  disabled={isLoading || isFetchingCrmContacts}
+                  title="Refresh contacts"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isFetchingCrmContacts ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+
+              {/* Loading state */}
+              {isFetchingCrmContacts && (
+                <div className="text-center py-8">
+                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-blue-600" />
+                  <p className="text-sm text-gray-600">Loading CRM contacts...</p>
+                </div>
+              )}
+
+              {/* Error state */}
+              {crmFetchError && !isFetchingCrmContacts && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                    <p className="text-sm font-medium text-red-800">Error Loading Contacts</p>
+                  </div>
+                  <p className="text-xs text-red-600">{crmFetchError}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchCrmContacts}
+                    className="mt-2"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Retry
+                  </Button>
+                </div>
+              )}
+
+              {/* Contact list */}
+              {!isFetchingCrmContacts && !crmFetchError && (
+                <>
+                  <div className="border rounded-lg max-h-96 overflow-y-auto">
+                    {filteredCrmContacts.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <Users className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                        <p>
+                          {crmSearchQuery.trim() 
+                            ? 'No contacts found matching your search' 
+                            : 'No contacts in CRM yet'}
+                        </p>
+                        {!crmSearchQuery.trim() && (
+                          <p className="text-sm mt-1">Upload a CSV to add contacts</p>
+                        )}
+                      </div>
+                    ) : (
+                      filteredCrmContacts.map((contact) => {
+                        const isSelected = selectedCrmContactIds.has(contact.id);
+                        const isAlreadyAdded = isContactAlreadyAdded(contact.phone_number);
+                        
+                        return (
+                          <div
+                            key={contact.id}
+                            className={`flex items-center p-3 border-b last:border-b-0 hover:bg-gray-50 transition-colors ${
+                              isAlreadyAdded ? 'bg-gray-50 opacity-60' : ''
+                            }`}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleCrmContact(contact.id)}
+                              disabled={isLoading || isAlreadyAdded}
+                            />
+                            <div className="ml-3 flex-1">
+                              <div className="flex items-center gap-2">
+                                <div className="font-medium text-sm">
+                                  {contact.name || contact.phone_number}
+                                </div>
+                                {isAlreadyAdded && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Already added
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500 font-mono">
+                                {contact.phone_number}
+                              </div>
+                              {(contact.company || contact.email) && (
+                                <div className="text-xs text-gray-400 mt-1">
+                                  {contact.company && <span>{contact.company}</span>}
+                                  {contact.company && contact.email && <span> • </span>}
+                                  {contact.email && <span>{contact.email}</span>}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Import button */}
+                  {filteredCrmContacts.length > 0 && (
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-600">
+                        {selectedCrmContactIds.size} contact{selectedCrmContactIds.size !== 1 ? 's' : ''} selected
+                      </div>
+                      <Button
+                        onClick={handleImportFromCRM}
+                        disabled={isLoading || selectedCrmContactIds.size === 0}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Import {selectedCrmContactIds.size} Contact{selectedCrmContactIds.size !== 1 ? 's' : ''}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Info banner */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-xs text-blue-700">
+                      💡 Tip: Select contacts from your CRM database to quickly add them for bulk sending. 
+                      Duplicates will be automatically skipped.
+                    </p>
+                  </div>
+                </>
               )}
             </TabsContent>
           </Tabs>
