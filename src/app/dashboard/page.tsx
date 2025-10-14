@@ -35,6 +35,7 @@ import { useConversations, type Conversation } from '@/lib/hooks/use-conversatio
 import { useCampaigns, type Campaign } from '@/lib/hooks/use-campaigns';
 import { useTasks } from '@/hooks/useCRM';
 import LeadQualificationWidget from '@/components/dashboard/lead-qualification-widget';
+import { dashboardApi } from '@/lib/api/dashboard';
 
 export default function DashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('Week');
@@ -239,6 +240,9 @@ export default function DashboardPage() {
 
   // Handle manual status refresh
   const handleRefreshStatus = async () => {
+    // Force live verification when user manually clicks refresh
+    await dashboardApi.getHealthCheck(true);
+    // Refetch to update React Query cache with fresh data
     await refetchHealth();
   };
 

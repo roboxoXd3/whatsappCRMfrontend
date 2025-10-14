@@ -13,8 +13,9 @@ export class DashboardAPI {
   }
 
   // Get health check
-  static async getHealthCheck(): Promise<ApiResponse<any>> {
-    return apiClient.get('/health');
+  static async getHealthCheck(forceLive: boolean = false): Promise<ApiResponse<any>> {
+    const params = forceLive ? '?force_live=true' : '';
+    return apiClient.get(`/health${params}`);
   }
 }
 
