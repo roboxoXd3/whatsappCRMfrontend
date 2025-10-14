@@ -24,7 +24,9 @@ import {
   ArrowDownRight,
   Loader2,
   Sparkles,
-  Zap
+  Zap,
+  RefreshCw,
+  Info
 } from 'lucide-react';
 
 // Import hooks for real data
@@ -39,7 +41,7 @@ export default function DashboardPage() {
 
   // Fetch real data using hooks
   const { data: dashboardStats, isLoading: statsLoading, error: statsError } = useDashboardStats();
-  const { data: healthData, isLoading: healthLoading } = useHealthCheck();
+  const { data: healthData, isLoading: healthLoading, refetch: refetchHealth, isFetching: isRefreshingHealth } = useHealthCheck();
   const { data: conversationsData } = useConversations({ limit: 5 });
   const { data: campaignsData } = useCampaigns({ limit: 5 });
   const { data: tasksData } = useTasks({ limit: 5, status: 'pending' });
@@ -235,6 +237,11 @@ export default function DashboardPage() {
     });
   }
 
+  // Handle manual status refresh
+  const handleRefreshStatus = async () => {
+    await refetchHealth();
+  };
+
   // Loading state
   if (statsLoading || healthLoading) {
     return (
@@ -295,10 +302,39 @@ export default function DashboardPage() {
 
         {/* Status Indicators */}
         <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 lg:p-6 shadow-lg border border-white/20 mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-            System Status
-          </h3>
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                System Status
+              </h3>
+              <div className="flex items-center mt-2 space-x-2">
+                <Info className="w-3.5 h-3.5 text-gray-400" />
+                <p className="text-xs text-gray-500 font-medium">
+                  Status auto-refreshes every 30s. Click refresh for instant update.
+                </p>
+              </div>
+            </div>
+            
+            {/* Refresh Button */}
+            <Button
+              onClick={handleRefreshStatus}
+              disabled={isRefreshingHealth}
+              variant="outline"
+              size="sm"
+              className="ml-4 bg-white/60 backdrop-blur-sm border-white/20 hover:bg-white/80 hover:shadow-md transition-all duration-200 group"
+            >
+              <RefreshCw 
+                className={`w-4 h-4 mr-2 transition-all duration-500 ${
+                  isRefreshingHealth ? 'animate-spin text-blue-600' : 'text-gray-600 group-hover:text-blue-600 group-hover:rotate-180'
+                }`} 
+              />
+              <span className="text-sm font-medium">
+                {isRefreshingHealth ? 'Updating...' : 'Refresh'}
+              </span>
+            </Button>
+          </div>
+          
           <div className="grid grid-cols-2 lg:flex lg:items-center lg:space-x-8 gap-4 lg:gap-0">
             {statusItems.map((item, index) => (
               <div key={index} className="flex items-center space-x-3 group">
