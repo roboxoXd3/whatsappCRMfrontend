@@ -21,6 +21,15 @@ interface Contact {
   company?: string;
 }
 
+// CRM contacts from API use different field names
+interface CRMContact {
+  id: string;
+  name: string;
+  phone_number: string;
+  email?: string;
+  company?: string;
+}
+
 export function BulkSendForm() {
   const { token } = useAuthStore(); // Get auth token
   const [message, setMessage] = useState('');
@@ -42,7 +51,7 @@ export function BulkSendForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // CRM import state
-  const [crmContacts, setCrmContacts] = useState<Contact[]>([]);
+  const [crmContacts, setCrmContacts] = useState<CRMContact[]>([]);
   const [crmSearchQuery, setCrmSearchQuery] = useState('');
   const [selectedCrmContactIds, setSelectedCrmContactIds] = useState<Set<string>>(new Set());
   const [isFetchingCrmContacts, setIsFetchingCrmContacts] = useState(false);
