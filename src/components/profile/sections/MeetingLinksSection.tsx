@@ -18,7 +18,7 @@ const schema = z.object({
   primary_calendly_url: z.string().url('Must be a valid Calendly URL'),
   calendly_link_label: z.string().min(3, 'Label is required'),
   auto_offer_meeting: z.enum(['never', 'qualified_only', 'all_interested']),
-  meeting_duration: z.number(),
+  meeting_duration: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)]),
   availability_note: z.string().optional(),
 });
 
