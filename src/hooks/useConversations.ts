@@ -21,8 +21,8 @@ export function useConversations(filters: ConversationFilters = {}) {
   return useQuery({
     queryKey: conversationKeys.list(filters),
     queryFn: () => conversationsService.getConversations(filters),
-    staleTime: 30 * 1000, // 30 seconds - shorter for faster updates
-    refetchInterval: 15 * 1000, // 15 seconds for real-time updates
+    staleTime: 5 * 1000, // 5 seconds - fresher data for faster updates
+    refetchInterval: 10 * 1000, // 10 seconds for real-time updates
     refetchIntervalInBackground: true, // Continue refetching when tab is not active
     refetchOnWindowFocus: true, // Refetch when user focuses the window
   });

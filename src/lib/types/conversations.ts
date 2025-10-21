@@ -14,6 +14,9 @@ export interface Conversation {
   last_message_role: 'user' | 'assistant' | 'human';
   status: 'active' | 'closed' | 'pending';
   tags: string[];
+  bot_enabled?: boolean; // Whether bot is active for this conversation
+  handover_requested?: boolean; // Whether handover to human was requested
+  handover_timestamp?: string; // When handover was requested
 }
 
 export interface ConversationDetail {
@@ -34,6 +37,8 @@ export interface ConversationDetail {
     lead_score: number;
   };
   bot_enabled?: boolean; // Whether bot is active for this conversation
+  handover_requested?: boolean; // Whether handover to human was requested
+  handover_timestamp?: string; // When handover was requested
   unread_count?: number; // Number of unread messages
   delivery_stats?: {
     total_sent: number;

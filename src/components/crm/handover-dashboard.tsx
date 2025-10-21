@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { AlertTriangle, Clock, CheckCircle, Phone, MessageSquare, User, TrendingUp, ExternalLink } from 'lucide-react';
+import { useConversations } from '@/hooks/useConversations';
 
 interface HandoverRequest {
   id: string;
@@ -29,70 +30,66 @@ export function HandoverDashboard() {
   const router = useRouter();
   const [handoverRequests, setHandoverRequests] = useState<HandoverRequest[]>([]);
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'resolved'>('all');
-  const [loading, setLoading] = useState(true);
+  
+  // Use the authenticated hook to fetch conversations
+  const { data: conversationsData, isLoading, error } = useConversations({ limit: 50 });
 
-  // Fetch real handover requests from API
+  // Transform conversations data into handover requests
   useEffect(() => {
-    const fetchHandoverRequests = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch conversations with bot disabled (handover requests)
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001'}/api/conversations/unique?limit=50`);
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-          // Filter conversations where bot is disabled (handover occurred)
-          const handoverConversations = data.data.filter((conv: any) => conv.bot_enabled === false);
-          
-          // Transform conversations into handover request format
-          const transformedRequests: HandoverRequest[] = handoverConversations.map((conv: any) => ({
-            id: conv.id,
-            contact: {
-              name: conv.contact.name || `Contact ${conv.contact.phone_number}`,
-              phone_number: conv.contact.phone_number,
-              lead_status: conv.contact.lead_status || 'new',
-              lead_score: conv.contact.lead_score || 0
-            },
-            handover_timestamp: conv.last_message_at,
-            handover_reason: 'User requested human support',
-            priority: 'high' as const,
-            status: 'pending' as const, // Default to pending
-            trigger_message: conv.last_message_preview || 'Customer requested human assistance',
-            ai_confidence: 0.85 // Default confidence
-          }));
-          
-          setHandoverRequests(transformedRequests);
-        }
-      } catch (error) {
-        console.error('Failed to fetch handover requests:', error);
-        
-        // Fallback to mock data if API fails
-        const mockData: HandoverRequest[] = [
-          {
-            id: '1',
-            contact: {
-              name: 'Customer Support Request',
-              phone_number: '919911223344',
-              lead_status: 'qualified',
-              lead_score: 25
-            },
-            handover_timestamp: '2025-07-28T02:20:41Z',
-            handover_reason: 'Customer requested human agent for delivery issue',
-            priority: 'high',
-            status: 'pending',
-            trigger_message: 'Hi! My delivery is late and I really need to speak with a customer service agent right now!',
-            ai_confidence: 0.90
-          }
-        ];
-        setHandoverRequests(mockData);
-      } finally {
-        setLoading(false);
+    if (conversationsData?.data) {
+      // Add debug logging
+      console.log('🔍 HANDOVER DEBUG - Total conversations:', conversationsData.data.length);
+      console.log('🔍 HANDOVER DEBUG - Conversations with bot disabled:', 
+        conversationsData.data.filter((c: any) => c.bot_enabled === false).length);
+      console.log('🔍 HANDOVER DEBUG - Conversations with handover requested:', 
+        conversationsData.data.filter((c: any) => c.handover_requested === true).length);
+      
+      // Filter conversations where bot is disabled OR handover was requested
+      const handoverConversations = conversationsData.data.filter((conv: any) => 
+        conv.bot_enabled === false || conv.handover_requested === true
+      );
+      
+      console.log('🔍 HANDOVER DEBUG - Filtered handover conversations:', handoverConversations.length);
+      
+      // Log a specific conversation if it exists
+      const targetConv = conversationsData.data.find((c: any) => 
+        c.contact.phone_number.includes('7033009600'));
+      if (targetConv) {
+        console.log('🔍 HANDOVER DEBUG - Target conversation (7033009600):', {
+          phone: targetConv.contact.phone_number,
+          bot_enabled: targetConv.bot_enabled,
+          handover_requested: targetConv.handover_requested,
+          handover_timestamp: targetConv.handover_timestamp
+        });
       }
-    };
-
-    fetchHandoverRequests();
-  }, []);
+      
+      // Transform conversations into handover request format
+      const transformedRequests: HandoverRequest[] = handoverConversations.map((conv: any) => ({
+        id: conv.id,
+        contact: {
+          name: conv.contact.name || `Contact ${conv.contact.phone_number}`,
+          phone_number: conv.contact.phone_number,
+          lead_status: conv.contact.lead_status || 'new',
+          lead_score: conv.contact.lead_score || 0
+        },
+        handover_timestamp: conv.handover_timestamp || conv.last_message_at,
+        handover_reason: 'User requested human support',
+        priority: 'high' as const,
+        status: 'pending' as const, // Default to pending
+        trigger_message: conv.last_message_preview || 'Customer requested human assistance',
+        ai_confidence: 0.85 // Default confidence
+      }));
+      
+      setHandoverRequests(transformedRequests);
+    }
+  }, [conversationsData]);
+  
+  // Log errors if any
+  useEffect(() => {
+    if (error) {
+      console.error('🔍 HANDOVER DEBUG - Error fetching conversations:', error);
+    }
+  }, [error]);
 
   const filteredRequests = handoverRequests.filter(request => 
     filter === 'all' || request.status === filter
@@ -136,7 +133,7 @@ export function HandoverDashboard() {
     return `${Math.floor(diffMinutes / 1440)}d ago`;
   };
 
-  if (loading) {
+  if (isLoading) {
     return <div className="p-6">Loading handover dashboard...</div>;
   }
 
@@ -323,20 +320,42 @@ export function HandoverDashboard() {
                       
                       {/* Status-based Actions */}
                       {request.status === 'pending' && (
-                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                        <Button 
+                          size="sm" 
+                          className="bg-blue-600 hover:bg-blue-700"
+                          onClick={() => {
+                            // Mark as in progress and navigate to conversation
+                            router.push(`/conversations?conversation=${request.id}`);
+                          }}
+                        >
                           <User className="w-4 h-4 mr-2" />
                           Take Over
                         </Button>
                       )}
                       
                       {/* Secondary Actions */}
-                      <Button size="sm" variant="outline">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => {
+                          // Navigate to conversation to see contact details
+                          router.push(`/conversations?conversation=${request.id}`);
+                        }}
+                      >
                         <User className="w-4 h-4 mr-2" />
                         Contact Details
                       </Button>
                       
                       {request.status === 'in_progress' && (
-                        <Button size="sm" variant="outline" className="text-green-600 border-green-300 hover:bg-green-50">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="text-green-600 border-green-300 hover:bg-green-50"
+                          onClick={() => {
+                            // Mark as resolved (could update status in backend)
+                            router.push(`/conversations?conversation=${request.id}`);
+                          }}
+                        >
                           <CheckCircle className="w-4 h-4 mr-2" />
                           Mark Resolved
                         </Button>

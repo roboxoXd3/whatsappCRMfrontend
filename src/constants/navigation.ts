@@ -12,6 +12,7 @@ import {
   UserCog,
   Smartphone,
   BookOpen,
+  Settings,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -110,6 +111,12 @@ export const secondaryNavigation: NavigationItem[] = [
     description: 'Connect your WhatsApp account',
     badge: 'New',
   },
+  {
+    name: 'Profile Settings',
+    href: '/profile',
+    icon: Settings,
+    description: 'Manage business info and AI settings',
+  },
 ];
 
 export const quickActions: NavigationItem[] = [
@@ -142,6 +149,7 @@ export const breadcrumbLabels: Record<string, string> = {
   handover: 'Handover Dashboard',
   'whatsapp-connect': 'WhatsApp Connect',
   'knowledge-base': 'Knowledge Base',
+  profile: 'Profile Settings',
   new: 'New',
   edit: 'Edit',
 }; 

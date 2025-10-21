@@ -214,8 +214,8 @@ export function useBotStatus(conversationId: string) {
       console.log('✅ Bot status fetched:', response.data);
       return response.data;
     },
-    staleTime: 5 * 1000, // 5 seconds (shorter for more responsive UI)
-    refetchInterval: 30 * 1000, // 30 seconds
+    staleTime: 1 * 1000, // 1 second - very fresh data for immediate UI updates
+    refetchInterval: 5 * 1000, // 5 seconds - faster polling for real-time updates
     enabled: !!conversationId, // Only run if conversationId exists
   });
 } 

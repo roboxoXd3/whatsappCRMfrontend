@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/lib/stores/auth';
+import PhoneNumberInput from '@/components/PhoneNumberInput';
 import { 
   Search, 
   Users, 
@@ -45,6 +46,7 @@ interface Contact {
   status?: string;
   profile_image_url?: string;
   whatsapp_status?: string;
+  is_manual?: boolean;  // Flag for manually added numbers
   raw_wasender_data?: {
     raw_data?: {
       id?: string;
@@ -589,14 +591,32 @@ export default function GroupCreationPage() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
+      // Separate manual phone numbers from database contact IDs
+      const manualContacts = selectedContacts.filter(c => c.is_manual);
+      const databaseContacts = selectedContacts.filter(c => !c.is_manual);
+      
+      // Prepare payload based on what we have
+      const payload: any = {
+        group_name: groupName.trim(),
+      };
+      
+      // If we have manual phone numbers, send them as phone_numbers array
+      if (manualContacts.length > 0) {
+        payload.phone_numbers = [
+          ...manualContacts.map(c => c.phone_number),
+          // Also include database contacts' phone numbers for unified approach
+          ...databaseContacts.map(c => c.phone_number)
+        ];
+      } else {
+        // No manual contacts, use the old format (contact_ids) for backward compatibility
+        payload.contact_ids = databaseContacts.map(c => c.id);
+        payload.auto_sync_missing = true;
+      }
+
       const response = await fetch(`${API_BASE}/api/group-messaging/groups/create-with-contacts`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          group_name: groupName.trim(),
-          contact_ids: selectedContacts.map(c => c.id),
-          auto_sync_missing: true, // Enable auto-sync for missing contacts
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data: GroupCreationResponse = await response.json();
@@ -909,6 +929,27 @@ export default function GroupCreationPage() {
               />
             </div>
 
+            {/* Manual Phone Number Entry - NEW */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Add by Phone Number (Optional)
+              </label>
+              <PhoneNumberInput 
+                onAdd={(phone) => {
+                  // Create a "manual" contact object that fits existing structure
+                  const manualContact: Contact = {
+                    id: `manual-${phone}`,
+                    phone_number: phone,
+                    name: `+${phone}`,
+                    is_manual: true  // Flag to show "Manually Added" badge
+                  };
+                  setSelectedContacts(prev => [...prev, manualContact]);
+                  toast.success(`Added ${phone} to selected contacts`);
+                }}
+                placeholder="Enter phone number to add"
+              />
+            </div>
+
             {/* Selected Contacts */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -935,14 +976,19 @@ export default function GroupCreationPage() {
                           
                           {/* Contact Info */}
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm font-medium text-gray-900 truncate">
                                 {contactInfo.name || `Contact ${contactInfo.phoneNumber}`}
                               </p>
-                              {contactInfo.verifiedName && (
+                              {contact.is_manual && (
+                                <Badge variant="outline" className="text-xs">
+                                  📱 Manually Added
+                                </Badge>
+                              )}
+                              {contactInfo.verifiedName && !contact.is_manual && (
                                 <CheckCircle2 className="h-3 w-3 text-green-600" />
                               )}
-                              {contactInfo.isBusiness && (
+                              {contactInfo.isBusiness && !contact.is_manual && (
                                 <Building2 className="h-3 w-3 text-blue-600" />
                               )}
                             </div>

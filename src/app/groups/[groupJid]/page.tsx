@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import PhoneNumberInput from '@/components/PhoneNumberInput';
 import { 
   ArrowLeft,
   Users, 
@@ -64,6 +66,7 @@ interface Contact {
   notify?: string;
   phone_number: string;
   jid?: string;
+  is_manual?: boolean;  // Flag for manually added numbers
 }
 
 export default function GroupDetailPage() {
@@ -94,6 +97,8 @@ export default function GroupDetailPage() {
   
   // Message state
   const [messageContent, setMessageContent] = useState('');
+  const [selectedMentions, setSelectedMentions] = useState<string[]>([]);
+  const [showMentionsDropdown, setShowMentionsDropdown] = useState(false);
   
   // Participant management
   const [searchQuery, setSearchQuery] = useState('');
@@ -277,15 +282,32 @@ export default function GroupDetailPage() {
       // Add delay before making the API call
       await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 second delay
       
+      // Build mentions array (NO TEXT MODIFICATION)
+      const mentionsArray = selectedMentions.map(jid => {
+        // Ensure JID format: phonenumber@s.whatsapp.net
+        if (!jid.includes('@')) {
+          return `${jid}@s.whatsapp.net`;
+        }
+        return jid;
+      });
+      
+      // Use message content as-is (user controls where @mentions go)
+      const payload: any = {
+        message_content: messageContent.trim(),  // No modification!
+        message_type: 'text',
+      };
+      
+      // Add mentions array for notifications
+      if (mentionsArray.length > 0) {
+        payload.mentions = mentionsArray;
+      }
+      
       const response = await fetch(`${API_BASE}/api/group-messaging/groups/${encodeURIComponent(groupJid)}/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          message_content: messageContent.trim(),
-          message_type: 'text',
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -294,6 +316,8 @@ export default function GroupDetailPage() {
       if (data.success) {
         toast.success('Message sent successfully');
         setMessageContent('');
+        setSelectedMentions([]);
+        setShowMentionsDropdown(false);
       } else if (data.rate_limited) {
         const retryAfterSeconds = data.retry_after || 60;
         toast.error(`Rate limit exceeded. Please wait ${retryAfterSeconds} seconds before trying again.`);
@@ -321,7 +345,7 @@ export default function GroupDetailPage() {
         q: query.trim(),
         limit: '20',
         offset: '0',
-        only_wasender: 'true'
+        only_wasender: 'false'  // Changed to false to search ALL database contacts
       });
 
       // Use sequential API call with delay to prevent rate limiting
@@ -730,12 +754,98 @@ export default function GroupDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <Textarea
-                    value={messageContent}
-                    onChange={(e) => setMessageContent(e.target.value)}
-                    placeholder="Type your message here..."
-                    rows={4}
-                  />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Message</Label>
+                      {selectedMentions.length > 0 && (
+                        <span className="text-xs text-blue-600">
+                          {selectedMentions.length} mention{selectedMentions.length > 1 ? 's' : ''} will be notified
+                        </span>
+                      )}
+                    </div>
+                    <Textarea
+                      value={messageContent}
+                      onChange={(e) => setMessageContent(e.target.value)}
+                      placeholder="Type your message here... Use @phonenumber to mention participants"
+                      rows={4}
+                    />
+                  </div>
+                  
+                  {/* Mention Participants Section */}
+                  <div className="border-t pt-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-sm font-medium">Mention Participants (Optional)</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowMentionsDropdown(!showMentionsDropdown)}
+                      >
+                        {showMentionsDropdown ? 'Hide' : 'Show'} Participants
+                      </Button>
+                    </div>
+                    
+                    {/* Selected Mentions Display */}
+                    {selectedMentions.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-xs text-gray-600">
+                          Selected mentions (click to copy @mention):
+                        </Label>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedMentions.map((jid) => {
+                            const participant = groupMetadata?.participants.find(p => p.jid === jid);
+                            const phoneNumber = jid.replace('@s.whatsapp.net', '').replace('@lid', '');
+                            const displayName = participant ? getParticipantName(participant) : phoneNumber;
+                            
+                            return (
+                              <Badge 
+                                key={jid} 
+                                variant="secondary" 
+                                className="flex items-center gap-1 cursor-pointer hover:bg-gray-200"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`@${phoneNumber}`);
+                                  toast.success(`Copied @${phoneNumber}`);
+                                }}
+                              >
+                                @{displayName} ({phoneNumber})
+                                <X
+                                  className="h-3 w-3 cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedMentions(prev => prev.filter(m => m !== jid));
+                                  }}
+                                />
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          💡 Tip: Click a badge to copy @mention, then paste it anywhere in your message
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Participants Dropdown */}
+                    {showMentionsDropdown && groupMetadata && (
+                      <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
+                        {groupMetadata.participants.map((participant) => (
+                          <div key={participant.jid} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded">
+                            <Checkbox
+                              checked={selectedMentions.includes(participant.jid)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedMentions(prev => [...prev, participant.jid]);
+                                } else {
+                                  setSelectedMentions(prev => prev.filter(jid => jid !== participant.jid));
+                                }
+                              }}
+                            />
+                            <span className="text-sm">{getParticipantName(participant)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
                   <Button
                     onClick={sendMessage}
                     disabled={isSendingMessage || !messageContent.trim()}
@@ -764,15 +874,45 @@ export default function GroupDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search contacts by name or phone..."
-                />
+                <div>
+                  <Label className="mb-2">Search Database Contacts</Label>
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search contacts by name or phone..."
+                  />
+                </div>
+
+                {/* Manual Phone Number Entry - NEW */}
+                <div className="border-t pt-4">
+                  <Label className="mb-2">Or Add by Phone Number</Label>
+                  <PhoneNumberInput 
+                    onAdd={(phone) => {
+                      const manualContact: Contact = {
+                        id: `manual-${phone}`,
+                        phone_number: phone,
+                        name: `+${phone}`,
+                        jid: `${phone}@s.whatsapp.net`,
+                        is_manual: true
+                      };
+                      setSelectedContacts(prev => [...prev, manualContact]);
+                      toast.success(`Added ${phone} to selection`);
+                    }}
+                    placeholder="Enter phone number"
+                  />
+                </div>
 
                 {isSearching && (
-                  <div className="text-center py-2">
-                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                  <div className="text-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                    <p className="text-xs text-gray-500">Searching contacts...</p>
+                  </div>
+                )}
+
+                {!isSearching && searchQuery && searchResults.length === 0 && (
+                  <div className="text-center py-4 text-sm text-gray-500">
+                    <p>No contacts found for "{searchQuery}"</p>
+                    <p className="text-xs mt-1">Try a different search or add by phone number below</p>
                   </div>
                 )}
 
@@ -781,7 +921,7 @@ export default function GroupDetailPage() {
                     {searchResults.map((contact) => (
                       <div
                         key={contact.id}
-                        className="flex items-center justify-between p-2 border rounded-lg"
+                        className="flex items-center justify-between p-2 border rounded-lg hover:bg-gray-50"
                       >
                         <div>
                           <p className="font-medium text-sm">
@@ -795,6 +935,7 @@ export default function GroupDetailPage() {
                           onClick={() => {
                             if (!selectedContacts.find(c => c.id === contact.id)) {
                               setSelectedContacts([...selectedContacts, contact]);
+                              toast.success(`Added ${contact.name || contact.phone_number}`);
                             }
                           }}
                           disabled={selectedContacts.some(c => c.id === contact.id)}
@@ -817,9 +958,10 @@ export default function GroupDetailPage() {
                       {selectedContacts.map((contact) => (
                         <Badge
                           key={contact.id}
-                          variant="secondary"
+                          variant={contact.is_manual ? "outline" : "secondary"}
                           className="flex items-center space-x-1"
                         >
+                          {contact.is_manual && <span>📱</span>}
                           <span>{contact.name || contact.notify || contact.phone_number}</span>
                           <X
                             className="h-3 w-3 cursor-pointer"
