@@ -3,19 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, 
-  MoreVertical, 
-  Phone, 
-  Video, 
   Info,
   Send,
   Paperclip,
   Smile,
   Loader2,
-  BarChart3,
   User,
-  Bot,
-  RefreshCw,
-  Brain
+  Bot
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +17,6 @@ import { Badge } from '@/components/ui/badge';
 // import { Separator } from '@/components/ui/separator';
 import { BotToggle } from './bot-toggle';
 import { MessageBubble } from './message-bubble';
-import { DeliveryStatsPanel } from './delivery-stats-panel';
 import { useConversationDetail } from '@/hooks/useConversationDetail';
 import { useSendMessage } from '@/hooks/useConversations';
 import { Conversation } from '@/lib/types/api';
@@ -55,9 +48,7 @@ export function ConversationDetail({
 }: ConversationDetailProps) {
   const [message, setMessage] = useState('');
   const [isUserScrolling, setIsUserScrolling] = useState(false);
-  const [showDeliveryStats, setShowDeliveryStats] = useState(false);
   const [lastMessageCount, setLastMessageCount] = useState(0);
-  const [hasNewMessages, setHasNewMessages] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -116,14 +107,11 @@ export function ConversationDetail({
     if (conversationDetail?.data?.messages) {
       const currentMessageCount = conversationDetail.data.messages.length;
       
-      // Check if we have new messages
+      // Check if we have new messages and auto-scroll if user is not scrolling
       if (lastMessageCount > 0 && currentMessageCount > lastMessageCount) {
-        setHasNewMessages(true);
-        
         // Auto-scroll to bottom if user is not scrolling and is near bottom
         if (!isUserScrolling) {
           scrollToBottom(true);
-          setHasNewMessages(false); // Clear indicator since we're scrolling to new messages
         }
       }
       
@@ -277,58 +265,11 @@ export function ConversationDetail({
               </div>
             </div>
           </div>
-                      <div className="flex items-center gap-0.5 sm:gap-1 lg:gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 flex-shrink-0">
               <BotToggle 
                 conversationId={conversation.id}
                 variant="compact"
               />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={`h-8 w-8 sm:h-10 sm:w-10 text-[#54656f] hover:bg-[#f5f6f6] transition-all duration-200 ${
-                  showLeadAnalysis 
-                    ? 'bg-purple-100 text-purple-600 border-2 border-purple-300 shadow-md' 
-                    : 'hover:bg-purple-50'
-                }`}
-                title="AI Lead Analysis"
-                onClick={onToggleLeadAnalysis}
-              >
-                <Brain className={`h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 ${showLeadAnalysis ? 'animate-pulse' : ''}`} />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={`relative h-8 w-8 sm:h-10 sm:w-10 text-[#54656f] hover:bg-[#f5f6f6] ${hasNewMessages ? 'bg-green-100 text-green-600' : ''}`}
-                title={hasNewMessages ? "New messages available - Click to refresh" : "Refresh Messages"}
-                onClick={() => {
-                  refetch();
-                  setHasNewMessages(false);
-                }}
-                disabled={isLoading}
-              >
-                <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 ${isLoading ? 'animate-spin' : ''}`} />
-                {hasNewMessages && (
-                  <div className="absolute -top-1 -right-1 w-2 h-2 sm:w-3 sm:h-3 bg-green-500 rounded-full animate-pulse" />
-                )}
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 sm:h-10 sm:w-10 text-[#54656f] hover:bg-[#f5f6f6]" 
-                title="Delivery Statistics"
-                onClick={() => setShowDeliveryStats(!showDeliveryStats)}
-              >
-                <BarChart3 className="h-3 w-3 sm:h-5 sm:w-5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="hidden sm:flex h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="Call">
-              <Phone className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="hidden sm:flex h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="Video Call">
-              <Video className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="hidden sm:flex h-10 w-10 text-[#54656f] hover:bg-[#f5f6f6]" title="More">
-              <MoreVertical className="h-5 w-5" />
-                          </Button>
             </div>
           </div>
           
@@ -375,17 +316,6 @@ export function ConversationDetail({
               </div>
             </div>
           )}
-
-          {/* Delivery Stats Panel (collapsible) */}
-          {showDeliveryStats && (
-            <div className="mt-3 pt-3 border-t border-gray-200">
-              <DeliveryStatsPanel 
-                conversationId={conversation.id}
-                variant="compact"
-                className="bg-white rounded-lg p-3 shadow-sm"
-              />
-            </div>
-          )}
         </div>
 
         {/* Messages Area - Enhanced mobile responsiveness */}
@@ -425,23 +355,6 @@ export function ConversationDetail({
                 ))}
                 {/* Invisible div for scroll targeting */}
                 <div ref={messagesEndRef} className="h-1" />
-                
-                {/* Scroll to bottom button when new messages arrive - Mobile optimized */}
-                {hasNewMessages && isUserScrolling && (
-                  <div className="absolute bottom-16 sm:bottom-20 right-2 sm:right-4 z-10">
-                    <Button
-                      size="sm"
-                      className="bg-green-500 hover:bg-green-600 text-white shadow-lg text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
-                      onClick={() => {
-                        scrollToBottom(true);
-                        setHasNewMessages(false);
-                      }}
-                    >
-                      <span className="hidden sm:inline">New messages ↓</span>
-                      <span className="sm:hidden">↓</span>
-                    </Button>
-                  </div>
-                )}
               </>
             ) : (
               <div className="text-center py-8">
