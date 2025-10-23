@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Send, Users, Upload, FileText, Plus, X, CheckCircle, AlertCircle, Clock, FileCheck, AlertTriangle, Sparkles, RefreshCw } from 'lucide-react';
+import { Send, Users, Upload, FileText, Plus, X, CheckCircle, AlertCircle, Clock, FileCheck, AlertTriangle, Sparkles, RefreshCw, Eye, Database, Download } from 'lucide-react';
 import Papa from 'papaparse';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -12,6 +12,22 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuthStore } from '@/lib/stores/auth';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 interface Contact {
   id: string;
@@ -30,8 +46,27 @@ interface CRMContact {
   company?: string;
 }
 
+// CSV Preview interfaces
+interface CSVPreviewData {
+  contacts: Contact[];
+  errors: string[];
+  detectedColumns: Record<string, string>;
+  statistics: {
+    totalRows: number;
+    valid: number;
+    invalid: number;
+  };
+  file: File;
+}
+
+interface ImportResult {
+  created: number;
+  updated: number;
+  failed: number;
+}
+
 export function BulkSendForm() {
-  const { token } = useAuthStore(); // Get auth token
+  const { token } = useAuthStore();
   const [message, setMessage] = useState('');
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
   const [contactInput, setContactInput] = useState('');
@@ -56,6 +91,12 @@ export function BulkSendForm() {
   const [selectedCrmContactIds, setSelectedCrmContactIds] = useState<Set<string>>(new Set());
   const [isFetchingCrmContacts, setIsFetchingCrmContacts] = useState(false);
   const [crmFetchError, setCrmFetchError] = useState<string | null>(null);
+  
+  // CSV Preview state
+  const [csvPreviewData, setCsvPreviewData] = useState<CSVPreviewData | null>(null);
+  const [showCsvPreview, setShowCsvPreview] = useState(false);
+  const [isSavingToCRM, setIsSavingToCRM] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   const handleAddContact = () => {
     if (contactInput.trim()) {
@@ -102,53 +143,23 @@ export function BulkSendForm() {
     setCsvErrors([]);
 
     try {
-      // First, parse CSV locally to show contacts immediately
+      // Parse CSV locally to show preview
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
         complete: async (results) => {
-          const contacts = parseCsvContacts(results.data as any[]);
-          if (contacts.length > 0) {
-            // Add contacts to selected list immediately
-            setSelectedContacts(prev => [...prev, ...contacts]);
-            
-            // Then upload to backend to save in database
-            try {
-              const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
-              const formData = new FormData();
-              formData.append('file', file);
-
-              const response = await fetch(`${baseURL}/api/bulk-send/import-contacts`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                },
-                body: formData,
-              });
-
-              const result = await response.json();
-
-              if (response.ok && result.status === 'success') {
-                setCsvUploadStatus('success');
-                console.log(`✅ ${result.data.successfully_imported} contacts saved to CRM`);
-                
-                // Show any errors from backend
-                if (result.data.errors && result.data.errors.length > 0) {
-                  setCsvErrors(result.data.errors);
-                }
-              } else {
-                setCsvUploadStatus('error');
-                setCsvErrors([result.message || 'Failed to save contacts to CRM']);
-              }
-            } catch (uploadError) {
-              console.error('Error uploading to backend:', uploadError);
-              setCsvUploadStatus('error');
-              setCsvErrors(['Contacts added to list but failed to save to CRM. They will be saved when you send messages.']);
-            }
-          } else {
-            setCsvUploadStatus('error');
-            setCsvErrors(['No valid contacts found in CSV file']);
-          }
+          const { contacts, errors: parseErrors, detectedColumns, statistics } = parseCsvContactsWithMetadata(results.data as any[]);
+          
+          // Show preview dialog with parsed data
+          setCsvPreviewData({
+            contacts,
+            errors: parseErrors,
+            detectedColumns,
+            statistics,
+            file
+          });
+          setShowCsvPreview(true);
+          setCsvUploadStatus('success');
         },
         error: (error) => {
           setCsvUploadStatus('error');
@@ -161,9 +172,10 @@ export function BulkSendForm() {
     }
   };
 
-  const parseCsvContacts = (data: any[]): Contact[] => {
+  const parseCsvContactsWithMetadata = (data: any[]) => {
     const contacts: Contact[] = [];
     const errors: string[] = [];
+    const detectedColumns: Record<string, string> = {};
 
     // Common phone number field names
     const phoneFields = ['phone', 'phone_number', 'mobile', 'whatsapp', 'number', 'contact'];
@@ -172,8 +184,12 @@ export function BulkSendForm() {
     const companyFields = ['company', 'organization', 'business'];
 
     if (data.length === 0) {
-      setCsvErrors(['CSV file is empty']);
-      return contacts;
+      return {
+        contacts,
+        errors: ['CSV file is empty'],
+        detectedColumns,
+        statistics: { totalRows: 0, valid: 0, invalid: 0 }
+      };
     }
 
     // Find field mappings
@@ -184,9 +200,19 @@ export function BulkSendForm() {
     const companyField = companyFields.find(field => headers.includes(field));
 
     if (!phoneField) {
-      setCsvErrors([`No phone number column found. Expected one of: ${phoneFields.join(', ')}`]);
-      return contacts;
+      return {
+        contacts,
+        errors: [`No phone number column found. Expected one of: ${phoneFields.join(', ')}`],
+        detectedColumns,
+        statistics: { totalRows: data.length, valid: 0, invalid: data.length }
+      };
     }
+
+    // Store detected columns
+    if (phoneField) detectedColumns['phone'] = phoneField;
+    if (nameField) detectedColumns['name'] = nameField;
+    if (emailField) detectedColumns['email'] = emailField;
+    if (companyField) detectedColumns['company'] = companyField;
 
     // Process each row
     data.forEach((row, index) => {
@@ -217,9 +243,9 @@ export function BulkSendForm() {
         return;
       }
 
-      // Check for duplicates
-      const existingContact = selectedContacts.find(c => c.phone === cleanedPhone);
-      if (existingContact) {
+      // Check for duplicates in current batch
+      const isDuplicate = contacts.some(c => c.phone === cleanedPhone);
+      if (isDuplicate) {
         errors.push(`Row ${rowNumber}: Duplicate phone number: ${phone}`);
         return;
       }
@@ -236,12 +262,78 @@ export function BulkSendForm() {
       contacts.push(contact);
     });
 
-    // Set errors if any
-    if (errors.length > 0) {
-      setCsvErrors(errors);
-    }
+    return {
+      contacts,
+      errors,
+      detectedColumns,
+      statistics: {
+        totalRows: data.length,
+        valid: contacts.length,
+        invalid: errors.length
+      }
+    };
+  };
 
+  const parseCsvContacts = (data: any[]): Contact[] => {
+    const { contacts } = parseCsvContactsWithMetadata(data);
     return contacts;
+  };
+
+  const handleAddToCampaign = () => {
+    if (csvPreviewData) {
+      // Add valid contacts to campaign list
+      setSelectedContacts(prev => [...prev, ...csvPreviewData.contacts]);
+      setShowCsvPreview(false);
+      setCsvPreviewData(null);
+    }
+  };
+
+  const handleSaveToCRM = async () => {
+    if (!csvPreviewData) return;
+
+    setIsSavingToCRM(true);
+    setImportResult(null);
+
+    try {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const formData = new FormData();
+      formData.append('file', csvPreviewData.file);
+
+      const response = await fetch(`${baseURL}/api/bulk-send/import-contacts`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok && (result.status === 'success' || result.status === 'partial_success')) {
+        const stats = result.data.statistics;
+        setImportResult({
+          created: stats.created || 0,
+          updated: stats.updated || 0,
+          failed: stats.failed || 0,
+        });
+        
+        // If there are errors, update csvErrors
+        const allErrors = [
+          ...(result.data.invalid_rows?.map((e: any) => e.error) || []),
+          ...(result.data.import_errors?.map((e: any) => e.error) || [])
+        ];
+        if (allErrors.length > 0) {
+          setCsvErrors(allErrors);
+        }
+      } else {
+        setCsvErrors([result.message || 'Failed to save contacts to CRM']);
+      }
+    } catch (error) {
+      console.error('Error saving to CRM:', error);
+      setCsvErrors(['Failed to save contacts to CRM. Please try again.']);
+    } finally {
+      setIsSavingToCRM(false);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -569,6 +661,7 @@ export function BulkSendForm() {
   };
 
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
       {/* Left Column - Form */}
       <div className="space-y-6">
@@ -1209,5 +1302,209 @@ export function BulkSendForm() {
         )}
       </div>
     </div>
+
+    {/* CSV Preview Dialog */}
+    <Dialog open={showCsvPreview} onOpenChange={setShowCsvPreview}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>CSV Import Preview</DialogTitle>
+          <DialogDescription>
+            Review the contacts parsed from your CSV file before importing.
+          </DialogDescription>
+        </DialogHeader>
+
+        {csvPreviewData && (
+          <div className="flex-1 overflow-y-auto space-y-4">
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-3 gap-3">
+              <Card className="p-4">
+                <div className="flex items-center gap-2">
+                  <FileCheck className="h-5 w-5 text-green-600" />
+                  <div>
+                    <div className="text-2xl font-bold text-green-600">
+                      {csvPreviewData.statistics.valid}
+                    </div>
+                    <div className="text-xs text-gray-600">Valid Contacts</div>
+                  </div>
+                </div>
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                  <div>
+                    <div className="text-2xl font-bold text-red-600">
+                      {csvPreviewData.statistics.invalid}
+                    </div>
+                    <div className="text-xs text-gray-600">Invalid Rows</div>
+                  </div>
+                </div>
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {csvPreviewData.statistics.totalRows}
+                    </div>
+                    <div className="text-xs text-gray-600">Total Rows</div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Detected Columns */}
+            {Object.keys(csvPreviewData.detectedColumns).length > 0 && (
+              <Card className="p-4">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  Detected Columns
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(csvPreviewData.detectedColumns).map(([key, value]) => (
+                    <Badge key={key} variant="secondary">
+                      {key}: <span className="font-mono ml-1">{value}</span>
+                    </Badge>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Import Result (if saved to CRM) */}
+            {importResult && (
+              <Card className="p-4 bg-green-50 border-green-200">
+                <h4 className="font-semibold mb-2 text-green-800 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  Import Results
+                </h4>
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div>
+                    <span className="text-green-700 font-medium">Created:</span>{' '}
+                    <span className="font-semibold">{importResult.created}</span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700 font-medium">Updated:</span>{' '}
+                    <span className="font-semibold">{importResult.updated}</span>
+                  </div>
+                  {importResult.failed > 0 && (
+                    <div>
+                      <span className="text-red-700 font-medium">Failed:</span>{' '}
+                      <span className="font-semibold">{importResult.failed}</span>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {/* Valid Contacts Table */}
+            {csvPreviewData.contacts.length > 0 && (
+              <Card className="p-4">
+                <h4 className="font-semibold mb-3">Valid Contacts ({csvPreviewData.contacts.length})</h4>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Phone</TableHead>
+                        {csvPreviewData.detectedColumns.email && <TableHead>Email</TableHead>}
+                        {csvPreviewData.detectedColumns.company && <TableHead>Company</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {csvPreviewData.contacts.slice(0, 10).map((contact) => (
+                        <TableRow key={contact.id}>
+                          <TableCell className="font-medium">{contact.name}</TableCell>
+                          <TableCell>{contact.phone}</TableCell>
+                          {csvPreviewData.detectedColumns.email && (
+                            <TableCell className="text-gray-600">{contact.email || '-'}</TableCell>
+                          )}
+                          {csvPreviewData.detectedColumns.company && (
+                            <TableCell className="text-gray-600">{contact.company || '-'}</TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {csvPreviewData.contacts.length > 10 && (
+                    <div className="p-2 bg-gray-50 text-center text-sm text-gray-600">
+                      Showing 10 of {csvPreviewData.contacts.length} contacts
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {/* Errors List */}
+            {csvPreviewData.errors.length > 0 && (
+              <Card className="p-4 bg-red-50 border-red-200">
+                <h4 className="font-semibold mb-2 text-red-800 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Errors ({csvPreviewData.errors.length})
+                </h4>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {csvPreviewData.errors.slice(0, 10).map((error, index) => (
+                    <div key={index} className="text-sm text-red-700 flex items-start gap-2">
+                      <span className="text-red-400">•</span>
+                      <span>{error}</span>
+                    </div>
+                  ))}
+                  {csvPreviewData.errors.length > 10 && (
+                    <div className="text-sm text-red-600 italic">
+                      ... and {csvPreviewData.errors.length - 10} more errors
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowCsvPreview(false);
+              setCsvPreviewData(null);
+              setImportResult(null);
+            }}
+          >
+            Close
+          </Button>
+          {csvPreviewData && csvPreviewData.contacts.length > 0 && (
+            <>
+              <Button
+                variant="secondary"
+                onClick={handleAddToCampaign}
+                disabled={isSavingToCRM}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add to Campaign
+              </Button>
+              <Button
+                onClick={handleSaveToCRM}
+                disabled={isSavingToCRM || !!importResult}
+              >
+                {isSavingToCRM ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : importResult ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Saved to CRM
+                  </>
+                ) : (
+                  <>
+                    <Database className="h-4 w-4 mr-2" />
+                    Save to CRM
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 } 
