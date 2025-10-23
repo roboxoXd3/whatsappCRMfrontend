@@ -1,7 +1,7 @@
 import * as React from "react"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 300 // 300ms delay before removing from DOM after dismiss
 
 type ToasterToast = {
   id: string
@@ -9,6 +9,7 @@ type ToasterToast = {
   description?: React.ReactNode
   action?: React.ReactElement
   variant?: "default" | "destructive"
+  duration?: number
 }
 
 const actionTypes = {
@@ -133,7 +134,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Toast) {
+function toast({ duration, ...props }: Toast) {
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -148,8 +149,16 @@ function toast({ ...props }: Toast) {
     toast: {
       ...props,
       id,
+      duration,
     },
   })
+
+  // Auto-dismiss after duration if specified
+  if (duration) {
+    setTimeout(() => {
+      dismiss()
+    }, duration)
+  }
 
   return {
     id: id,

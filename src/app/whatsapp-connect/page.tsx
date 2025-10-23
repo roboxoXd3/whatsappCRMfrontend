@@ -547,6 +547,7 @@ export default function WhatsAppConnectPage() {
       toast({
         title: "Webhook configuration updated",
         description: "Your webhook settings have been successfully updated.",
+        duration: 3000, // Auto-dismiss after 3 seconds
       });
       
       // Refresh sessions to show updated webhook status
