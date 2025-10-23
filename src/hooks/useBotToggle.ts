@@ -166,6 +166,8 @@ export function useBotToggle() {
       new_status: boolean;
       action: 'enabled' | 'disabled';
       updated_count: number;
+      failed_count: number;
+      success_rate: number;
       reason?: string;
       timestamp: string;
     }> => {
@@ -177,9 +179,26 @@ export function useBotToggle() {
       
       return response.data;
     },
-    onSuccess: () => {
-      // Invalidate and refetch bot status queries
+    onSuccess: (data) => {
+      console.log('🔄 Bulk bot toggle successful, invalidating cache...', data);
+      
+      // Invalidate all bot toggle queries
       queryClient.invalidateQueries({ queryKey: botToggleKeys.all });
+      
+      // Invalidate conversation list to update status indicators
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      
+      // Invalidate individual conversation status for affected conversations
+      data.conversation_ids.forEach(convId => {
+        queryClient.invalidateQueries({ 
+          queryKey: botToggleKeys.status(convId) 
+        });
+      });
+      
+      // Force refetch of bot status summary
+      queryClient.refetchQueries({ 
+        queryKey: botToggleKeys.summary() 
+      });
     },
   });
 

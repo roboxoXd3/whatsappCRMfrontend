@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { Search, Plus, MessageCircle, X, Filter, SortAsc } from 'lucide-react';
+import { Search, Plus, MessageCircle, X, Filter, SortAsc, Bot, User } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,9 @@ import { Conversation } from '@/lib/types/api';
 import { ConversationFilters } from '@/lib/types/conversations';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useBotToggle } from '@/hooks/useBotToggle';
+import { BulkBotToggleDialog } from './bulk-bot-toggle-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface ConversationListProps {
   selectedConversationId?: string;
@@ -30,6 +33,14 @@ export function ConversationList({
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [filterBy, setFilterBy] = useState<FilterOption>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [showBulkToggleDialog, setShowBulkToggleDialog] = useState(false);
+  const [bulkToggleAction, setBulkToggleAction] = useState<'enable' | 'disable'>('enable');
+
+  // Toast notifications
+  const { toast } = useToast();
+
+  // Bot toggle hook
+  const { bulkToggleBot, isToggling } = useBotToggle();
 
   // Debounce search query to avoid too many API calls
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -178,6 +189,55 @@ export function ConversationList({
         return rawConversations.length;
     }
   }, [rawConversations]);
+
+  // Bulk toggle handlers
+  const handleBulkEnableBot = useCallback(() => {
+    if (conversations.length === 0) {
+      toast({
+        title: 'No conversations',
+        description: 'There are no conversations to enable bot for.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setBulkToggleAction('enable');
+    setShowBulkToggleDialog(true);
+  }, [conversations.length, toast]);
+
+  const handleBulkDisableBot = useCallback(() => {
+    if (conversations.length === 0) {
+      toast({
+        title: 'No conversations',
+        description: 'There are no conversations to disable bot for.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setBulkToggleAction('disable');
+    setShowBulkToggleDialog(true);
+  }, [conversations.length, toast]);
+
+  const handleBulkToggleConfirm = useCallback(async () => {
+    const conversationIds = conversations.map(conv => conv.id);
+    const enabled = bulkToggleAction === 'enable';
+
+    try {
+      const result = await bulkToggleBot.mutateAsync({
+        conversation_ids: conversationIds,
+        enabled,
+        reason: `Bulk ${enabled ? 'enable' : 'disable'} by admin from conversation list`,
+      });
+
+      // Show success toast
+      toast({
+        title: 'Success',
+        description: `Bot ${enabled ? 'enabled' : 'disabled'} for ${result.updated_count} conversation${result.updated_count !== 1 ? 's' : ''}${result.failed_count > 0 ? ` (${result.failed_count} failed)` : ''}`,
+      });
+    } catch (error) {
+      // Error toast is shown by the dialog
+      throw error;
+    }
+  }, [conversations, bulkToggleAction, bulkToggleBot, toast]);
 
   const renderConversationItem = useCallback((conversation: Conversation, index: number) => {
     const isSelected = selectedConversationId === conversation.id;
@@ -381,6 +441,31 @@ export function ConversationList({
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Bulk Bot Toggle Buttons */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBulkEnableBot}
+                disabled={conversations.length === 0 || isToggling}
+                className="h-8 px-2 bg-green-50 border-green-200 hover:bg-green-100 text-green-700 hidden sm:flex"
+                title="Enable bot for all conversations"
+              >
+                <Bot className="h-4 w-4 mr-1" />
+                <span className="text-xs">Enable All</span>
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBulkDisableBot}
+                disabled={conversations.length === 0 || isToggling}
+                className="h-8 px-2 bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700 hidden sm:flex"
+                title="Disable bot for all conversations"
+              >
+                <User className="h-4 w-4 mr-1" />
+                <span className="text-xs">Disable All</span>
+              </Button>
+
               <span className="text-xs text-gray-500 hidden sm:inline">
                 {conversations.length} of {rawConversations.length}
               </span>
@@ -464,6 +549,16 @@ export function ConversationList({
           </div>
         </div>
       </div>
+
+      {/* Bulk Bot Toggle Dialog */}
+      <BulkBotToggleDialog
+        isOpen={showBulkToggleDialog}
+        onClose={() => setShowBulkToggleDialog(false)}
+        action={bulkToggleAction}
+        conversations={conversations}
+        onConfirm={handleBulkToggleConfirm}
+        isLoading={isToggling}
+      />
     </div>
   );
 } 
