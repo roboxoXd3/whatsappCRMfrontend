@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { Send, Users, Upload, FileText, Plus, X, CheckCircle, AlertCircle, Clock, FileCheck, AlertTriangle, Sparkles, RefreshCw, Eye, Database, Download } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Send, Users, Upload, FileText, Plus, X, CheckCircle, AlertCircle, Clock, FileCheck, AlertTriangle, Sparkles, RefreshCw, Eye, Database, Download, Image as ImageIcon, Video as VideoIcon, Info, FolderOpen } from 'lucide-react';
 import Papa from 'papaparse';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,7 +11,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuthStore } from '@/lib/stores/auth';
+import { useBulkSendProgress } from '@/hooks/useBulkSendProgress';
+import { useToast } from '@/hooks/use-toast';
+import { MediaUploader } from '@/components/media/MediaUploader';
+import { MediaLibrary } from '@/components/media/MediaLibrary';
+import { MediaUploadResult } from '@/hooks/useMediaUpload';
+import { MediaLibraryFile } from '@/hooks/useMediaLibrary';
 import {
   Dialog,
   DialogContent,
@@ -67,6 +74,7 @@ interface ImportResult {
 
 export function BulkSendForm() {
   const { token } = useAuthStore();
+  const { toast } = useToast();
   const [message, setMessage] = useState('');
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
   const [contactInput, setContactInput] = useState('');
@@ -95,8 +103,86 @@ export function BulkSendForm() {
   // CSV Preview state
   const [csvPreviewData, setCsvPreviewData] = useState<CSVPreviewData | null>(null);
   const [showCsvPreview, setShowCsvPreview] = useState(false);
+  
+  // Media upload state
+  const [mediaResult, setMediaResult] = useState<MediaUploadResult | null>(null);
+  const [showMediaUploader, setShowMediaUploader] = useState(false);
+  const [showMediaLibrary, setShowMediaLibrary] = useState(false);
   const [isSavingToCRM, setIsSavingToCRM] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+
+  // Use the polling hook for real-time progress
+  const { progress, isLoading: isPolling, error: pollingError } = useBulkSendProgress(
+    activeCampaignId,
+    {
+      enabled: !!activeCampaignId && jobStatus === 'sending',
+      pollInterval: 2000, // Poll every 2 seconds
+      onComplete: (completedProgress) => {
+        // Campaign completed
+        setJobStatus('completed');
+        setSendingProgress({
+          current: completedProgress.progress.total,
+          total: completedProgress.progress.total,
+          successful: completedProgress.progress.successful,
+          failed: completedProgress.progress.failed
+        });
+        
+        // Clear form
+        setMessage('');
+        setSelectedContacts([]);
+        clearCsvUpload();
+        
+        // Show completion toast
+        toast({
+          title: "Bulk Send Completed!",
+          description: `✓ Sent: ${completedProgress.progress.successful}, ✗ Failed: ${completedProgress.progress.failed}`,
+          duration: 5000,
+        });
+        
+        // Clear from localStorage
+        localStorage.removeItem('activeBulkSendCampaign');
+        setActiveCampaignId(null);
+      },
+      onError: (error) => {
+        console.error('Polling error:', error);
+      }
+    }
+  );
+
+  // Update progress from polling data
+  useEffect(() => {
+    if (progress && jobStatus === 'sending') {
+      setSendingProgress({
+        current: progress.progress.current,
+        total: progress.progress.total,
+        successful: progress.progress.successful,
+        failed: progress.progress.failed
+      });
+      
+      // Check if cancelled
+      if (progress.status === 'cancelled') {
+        setJobStatus('cancelled');
+        setActiveCampaignId(null);
+        localStorage.removeItem('activeBulkSendCampaign');
+      }
+    }
+  }, [progress, jobStatus]);
+
+  // Restore active campaign from localStorage on mount
+  useEffect(() => {
+    const storedCampaignId = localStorage.getItem('activeBulkSendCampaign');
+    if (storedCampaignId) {
+      setActiveCampaignId(storedCampaignId);
+      setJobStatus('sending');
+      
+      // Show notification that we're resuming
+      toast({
+        title: "Resuming Bulk Send",
+        description: "Reconnecting to your active bulk send campaign...",
+        duration: 3000,
+      });
+    }
+  }, [toast]);
 
   const handleAddContact = () => {
     if (contactInput.trim()) {
@@ -465,6 +551,41 @@ export function BulkSendForm() {
     }
   };
 
+  // Media upload handlers
+  const handleMediaUploadComplete = (result: MediaUploadResult) => {
+    setMediaResult(result);
+    setShowMediaUploader(false);
+    toast({
+      title: "Media uploaded successfully",
+      description: result.compression_applied
+        ? `Compressed from ${result.original_size_mb.toFixed(2)}MB to ${result.compressed_size_mb.toFixed(2)}MB`
+        : `Ready to send (${result.compressed_size_mb.toFixed(2)}MB)`,
+    });
+  };
+
+  const handleLibrarySelect = (file: MediaLibraryFile) => {
+    // Convert library file to MediaUploadResult format
+    const result: MediaUploadResult = {
+      media_url: file.media_url,
+      media_type: file.media_type,
+      original_size_mb: file.size_mb,
+      compressed_size_mb: file.size_mb,
+      compression_applied: false, // Already compressed
+      compression_ratio: 1.0
+    };
+    setMediaResult(result);
+    setShowMediaLibrary(false);
+    toast({
+      title: "Media selected",
+      description: `Using existing ${file.media_type} (${file.size_mb.toFixed(2)}MB)`,
+    });
+  };
+
+  const handleRemoveMedia = () => {
+    setMediaResult(null);
+    setShowMediaUploader(false);
+  };
+
   // Fetch CRM contacts
   const fetchCrmContacts = async () => {
     setIsFetchingCrmContacts(true);
@@ -574,14 +695,31 @@ export function BulkSendForm() {
       if (response.ok && result.status === 'success') {
         setJobStatus('cancelled');
         console.log('Campaign cancelled successfully');
-        alert('Campaign is stopping. The current message will complete, then it will stop.');
+        toast({
+          title: "Campaign Stopping",
+          description: "The campaign is stopping. The current message will complete, then it will stop.",
+          duration: 5000,
+        });
+        
+        // Clear from localStorage
+        localStorage.removeItem('activeBulkSendCampaign');
       } else {
         console.error('Failed to cancel campaign:', result.message);
-        alert('Failed to stop campaign. Please try again.');
+        toast({
+          title: "Failed to Stop",
+          description: "Failed to stop campaign. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
       }
     } catch (error) {
       console.error('Error cancelling campaign:', error);
-      alert('Error stopping campaign. Please try again.');
+      toast({
+        title: "Error",
+        description: "Error stopping campaign. Please try again.",
+        variant: "destructive",
+        duration: 5000,
+      });
     } finally {
       setIsStopping(false);
       setActiveCampaignId(null);
@@ -616,47 +754,58 @@ export function BulkSendForm() {
           campaign_name: `Bulk Send ${new Date().toLocaleString()}`,
           with_retry: true,
           use_ai_personalization: useAIPersonalization,
-          personalize_per_contact: true
+          personalize_per_contact: true,
+          // Add media if uploaded
+          ...(mediaResult && {
+            media_type: mediaResult.media_type,
+            media_url: mediaResult.media_url,
+            media_size: Math.round(mediaResult.compressed_size_mb * 1024 * 1024)
+          })
         }),
       });
 
       const result = await response.json();
 
       if (response.ok && result.status === 'success') {
-        // Store campaign ID for cancellation
-        if (result.data.campaign_id) {
-          setActiveCampaignId(result.data.campaign_id);
-        }
+        // Store campaign ID and start polling
+        const campaignId = result.data.campaign_id;
+        setActiveCampaignId(campaignId);
         
-        // Update final progress
-        setSendingProgress({
-          current: result.data.total_contacts,
-          total: result.data.total_contacts,
-          successful: result.data.successful_sends,
-          failed: result.data.failed_sends
+        // Save to localStorage for persistence
+        localStorage.setItem('activeBulkSendCampaign', campaignId);
+        
+        // Show success toast
+        toast({
+          title: "Bulk Send Started!",
+          description: `Sending ${selectedContacts.length} messages in the background. You can navigate away from this page.`,
+          duration: 5000,
         });
         
-        setJobStatus('completed');
-        setMessage('');
-        setSelectedContacts([]);
-        clearCsvUpload();
-        setActiveCampaignId(null);
+        // Clear isLoading since the job is now running in background
+        setIsLoading(false);
         
-        // Show success message with details
-        console.log('Bulk send completed:', result.data);
-        alert(`✅ Bulk send completed!\n✓ Sent: ${result.data.successful_sends}\n✗ Failed: ${result.data.failed_sends}`);
+        // Job status remains 'sending' and polling will handle updates
       } else {
         setJobStatus('failed');
+        setIsLoading(false);
         console.error('Bulk send failed:', result.message);
-        alert(`❌ Bulk send failed: ${result.message}`);
+        toast({
+          title: "Bulk Send Failed",
+          description: result.message || "Failed to start bulk send",
+          variant: "destructive",
+          duration: 5000,
+        });
       }
     } catch (error) {
       console.error('Bulk send failed:', error);
       setJobStatus('failed');
-      alert('❌ Bulk send failed. Please check your connection.');
-    } finally {
       setIsLoading(false);
-      setActiveCampaignId(null);
+      toast({
+        title: "Bulk Send Failed",
+        description: "Failed to start bulk send. Please check your connection.",
+        variant: "destructive",
+        duration: 5000,
+      });
     }
   };
 
@@ -779,6 +928,89 @@ export function BulkSendForm() {
                 </div>
               </div>
             </div>
+
+            {/* Media Attachment Section */}
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <Label>Media Attachment (Optional)</Label>
+                {!showMediaUploader && !mediaResult && (
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setShowMediaUploader(true)}
+                      disabled={isLoading}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload New
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setShowMediaLibrary(true)}
+                      disabled={isLoading}
+                    >
+                      <FolderOpen className="h-4 w-4 mr-2" />
+                      Browse Library
+                    </Button>
+                  </div>
+                )}
+              </div>
+              
+              {showMediaUploader && !mediaResult && (
+                <MediaUploader
+                  onUploadComplete={handleMediaUploadComplete}
+                  onUploadError={(error) => toast({ 
+                    title: "Upload failed", 
+                    description: error, 
+                    variant: "destructive" 
+                  })}
+                  showPreview={true}
+                  uploadButtonText="Upload Media"
+                />
+              )}
+              
+              <MediaLibrary
+                isOpen={showMediaLibrary}
+                onClose={() => setShowMediaLibrary(false)}
+                onSelect={handleLibrarySelect}
+                mediaType="all"
+              />
+              
+              {mediaResult && (
+                <div className="border rounded-lg p-4 bg-blue-50">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="secondary">
+                        {mediaResult.media_type === 'image' ? '📷 Image' : '🎥 Video'}
+                      </Badge>
+                      <div>
+                        <p className="text-sm font-medium">{mediaResult.compressed_size_mb.toFixed(2)} MB</p>
+                        {mediaResult.compression_applied && (
+                          <p className="text-xs text-muted-foreground">
+                            Compressed from {mediaResult.original_size_mb.toFixed(2)} MB
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={handleRemoveMedia}
+                      disabled={isLoading}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Alert className="mt-2">
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Your message will be sent as a caption with the {mediaResult.media_type}
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
+            </Card>
 
             {/* Preview Button */}
             {selectedContacts.length > 0 && (
@@ -1094,6 +1326,17 @@ export function BulkSendForm() {
                 </span>
               </div>
               
+              {/* Background Job Indicator */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center gap-2 text-sm text-blue-800">
+                  <Clock className="h-4 w-4 animate-spin" />
+                  <span className="font-medium">Running in background</span>
+                </div>
+                <p className="text-xs text-blue-600 mt-1">
+                  You can navigate away from this page. Messages will continue sending.
+                </p>
+              </div>
+              
               {/* Progress Bar */}
               <div className="w-full bg-gray-200 rounded-full h-2.5">
                 <div 
@@ -1112,7 +1355,9 @@ export function BulkSendForm() {
                     <span className="text-red-600">✗ {sendingProgress.failed} failed</span>
                   )}
                 </div>
-                <span>~{Math.ceil((sendingProgress.total - sendingProgress.current) * 3 / 60)}m remaining</span>
+                {progress?.estimated_time_remaining && (
+                  <span>~{progress.estimated_time_remaining} remaining</span>
+                )}
               </div>
               
               {/* Stop Button */}
@@ -1141,7 +1386,7 @@ export function BulkSendForm() {
           {/* Send Button */}
           <Button
             onClick={handleBulkSend}
-            disabled={!message.trim() || selectedContacts.length === 0 || isLoading}
+            disabled={!message.trim() || selectedContacts.length === 0 || isLoading || jobStatus === 'sending'}
             className="w-full"
             size="lg"
           >
@@ -1149,6 +1394,11 @@ export function BulkSendForm() {
               <>
                 <Clock className="h-4 w-4 mr-2 animate-spin" />
                 Starting bulk send...
+              </>
+            ) : jobStatus === 'sending' ? (
+              <>
+                <Clock className="h-4 w-4 mr-2 animate-spin" />
+                Sending in background...
               </>
             ) : (
               <>

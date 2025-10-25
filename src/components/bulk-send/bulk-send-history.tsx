@@ -2,16 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, CheckCircle, AlertCircle, Users, MessageSquare, Calendar, MoreHorizontal, Eye, Download, RefreshCw, X, Phone, User, Building2, Mail, ArrowRight } from 'lucide-react';
+import { Clock, CheckCircle, AlertCircle, Users, MessageSquare, Calendar, MoreHorizontal, Eye, Download, RefreshCw, X, Phone, User, Building2, Mail, ArrowRight, AlertTriangle, Image as ImageIcon, Video as VideoIcon, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
+import { useAuthStore } from '@/lib/stores/auth';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -20,6 +23,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface BulkJob {
   id: string;
@@ -32,6 +45,9 @@ interface BulkJob {
   created_at: string;
   started_at?: string;
   completed_at?: string;
+  media_type?: 'image' | 'video' | null;
+  media_url?: string | null;
+  media_size?: number | null;
 }
 
 interface MessageResult {
@@ -53,12 +69,17 @@ interface CampaignDetails {
 
 export function BulkSendHistory() {
   const router = useRouter();
+  const { toast } = useToast();
+  const { token } = useAuthStore();
   const [jobs, setJobs] = useState<BulkJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [selectedJobForUpdate, setSelectedJobForUpdate] = useState<string | null>(null);
 
   // Navigate to conversation page with specific phone number
   const navigateToConversation = (phoneNumber: string) => {
@@ -159,33 +180,219 @@ export function BulkSendHistory() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   const getSuccessRate = (job: BulkJob) => {
-    if (job.total_contacts === 0) return 0;
-    return Math.round((job.successful_sends / job.total_contacts) * 100);
+    if (!job.total_contacts || job.total_contacts === 0) return 0;
+    const successful = job.successful_sends || 0;
+    return Math.round((successful / job.total_contacts) * 100);
+  };
+
+  const isJobStuck = (job: BulkJob): boolean => {
+    if (job.status !== 'running') return false;
+    if (!job.started_at) return false;
+    
+    const startedAt = new Date(job.started_at);
+    const now = new Date();
+    const hoursAgo = (now.getTime() - startedAt.getTime()) / (1000 * 60 * 60);
+    
+    return hoursAgo > 1; // Consider stuck if running for more than 1 hour
+  };
+
+  const handleUpdateCampaignStatus = async (campaignId: string, newStatus: 'failed' | 'completed' | 'cancelled') => {
+    try {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const response = await fetch(`${baseURL}/api/bulk-send/campaigns/${campaignId}/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          reason: 'Manual status update from UI'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status === 'success') {
+        toast({
+          title: "Status Updated",
+          description: `Campaign marked as ${newStatus}`,
+          duration: 3000,
+        });
+        
+        // Refresh the jobs list
+        fetchJobs();
+      } else {
+        toast({
+          title: "Update Failed",
+          description: result.message || `Failed to update campaign status`,
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      console.error('Error updating campaign status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update campaign status. Please try again.",
+        variant: "destructive",
+        duration: 5000,
+      });
+    } finally {
+      setSelectedJobForUpdate(null);
+    }
+  };
+
+  const handleCancelCampaign = async (campaignId: string) => {
+    try {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const response = await fetch(`${baseURL}/api/bulk-send/cancel/${campaignId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status === 'success') {
+        toast({
+          title: "Campaign Stopped",
+          description: "The campaign will stop after the current message completes",
+          duration: 5000,
+        });
+        
+        // Refresh the jobs list after a short delay to show the cancelled status
+        setTimeout(() => {
+          fetchJobs();
+        }, 1000);
+      } else {
+        toast({
+          title: "Stop Failed",
+          description: result.message || "Failed to stop campaign",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      console.error('Error cancelling campaign:', error);
+      toast({
+        title: "Error",
+        description: "Failed to stop campaign. Please try again.",
+        variant: "destructive",
+        duration: 5000,
+      });
+    }
+  };
+
+  const handleCleanupStuckCampaigns = async () => {
+    setIsCleaningUp(true);
+    
+    try {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+      const response = await fetch(`${baseURL}/api/bulk-send/cleanup-stuck-campaigns?hours_threshold=24`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status === 'success') {
+        const count = result.data.count;
+        
+        toast({
+          title: "Cleanup Complete",
+          description: `${count} campaign(s) marked as failed`,
+          duration: 5000,
+        });
+        
+        // Refresh the jobs list
+        if (count > 0) {
+          fetchJobs();
+        }
+      } else {
+        toast({
+          title: "Cleanup Failed",
+          description: result.message || "Failed to cleanup stuck campaigns",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      console.error('Error cleaning up stuck campaigns:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cleanup stuck campaigns. Please try again.",
+        variant: "destructive",
+        duration: 5000,
+      });
+    } finally {
+      setIsCleaningUp(false);
+      setShowCleanupDialog(false);
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Refresh Button */}
-      <div className="flex justify-end">
-        <Button 
-          onClick={fetchJobs} 
-          disabled={isLoading}
-          variant="outline"
-          size="sm"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+      {/* Refresh and Cleanup Buttons */}
+      <div className="flex justify-between items-center">
+        <div>
+          {jobs.filter(job => isJobStuck(job)).length > 0 && (
+            <Badge variant="destructive" className="gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              {jobs.filter(job => isJobStuck(job)).length} stuck campaign(s)
+            </Badge>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {jobs.filter(job => job.status === 'running').length > 0 && (
+            <Button 
+              onClick={() => setShowCleanupDialog(true)} 
+              disabled={isLoading}
+              variant="outline"
+              size="sm"
+              className="text-orange-600 border-orange-200 hover:bg-orange-50"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Cleanup Stuck
+            </Button>
+          )}
+          <Button 
+            onClick={fetchJobs} 
+            disabled={isLoading}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Error Alert */}
@@ -228,7 +435,7 @@ export function BulkSendHistory() {
             <div>
               <p className="text-sm font-medium text-gray-500">Messages Sent</p>
               <p className="text-2xl font-bold">
-                {jobs.reduce((sum, job) => sum + job.successful_sends, 0)}
+                {jobs.reduce((sum, job) => sum + (job.successful_sends || 0), 0)}
               </p>
             </div>
           </div>
@@ -240,10 +447,12 @@ export function BulkSendHistory() {
             <div>
               <p className="text-sm font-medium text-gray-500">Success Rate</p>
               <p className="text-2xl font-bold">
-                {Math.round(
-                  (jobs.reduce((sum, job) => sum + job.successful_sends, 0) /
-                   jobs.reduce((sum, job) => sum + job.total_contacts, 0)) * 100
-                )}%
+                {(() => {
+                  const totalContacts = jobs.reduce((sum, job) => sum + (job.total_contacts || 0), 0);
+                  const successfulSends = jobs.reduce((sum, job) => sum + (job.successful_sends || 0), 0);
+                  if (totalContacts === 0) return '0';
+                  return Math.round((successfulSends / totalContacts) * 100);
+                })()}%
               </p>
             </div>
           </div>
@@ -287,21 +496,55 @@ export function BulkSendHistory() {
                 <TableRow key={job.id}>
                   <TableCell className="font-mono text-sm">{job.id}</TableCell>
                   <TableCell className="max-w-xs">
-                    <div className="truncate" title={job.message_content}>
-                      {job.message_content}
+                    <div className="flex items-center gap-2">
+                      <div className="truncate" title={job.message_content}>
+                        {job.message_content}
+                      </div>
+                      {job.media_type && (
+                        <Badge variant="secondary" className="flex-shrink-0">
+                          {job.media_type === 'image' ? (
+                            <>
+                              <ImageIcon className="h-3 w-3 mr-1" />
+                              Image
+                            </>
+                          ) : (
+                            <>
+                              <VideoIcon className="h-3 w-3 mr-1" />
+                              Video
+                            </>
+                          )}
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {getStatusIcon(job.status)}
                       {getStatusBadge(job.status)}
+                      {isJobStuck(job) && (
+                        <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50 text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Stuck?
+                        </Badge>
+                      )}
+                      {job.status === 'running' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCancelCampaign(job.id)}
+                          className="text-red-600 border-red-200 hover:bg-red-50 text-xs h-6 px-2"
+                        >
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Stop
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      <div className="font-medium">{job.total_contacts} total</div>
+                      <div className="font-medium">{job.total_contacts || 0} total</div>
                       <div className="text-gray-500">
-                        {job.successful_sends} sent, {job.failed_sends} failed
+                        {job.successful_sends || 0} sent, {job.failed_sends || 0} failed
                       </div>
                     </div>
                   </TableCell>
@@ -322,7 +565,7 @@ export function BulkSendHistory() {
                     {formatDate(job.created_at)}
                   </TableCell>
                   <TableCell className="text-sm text-gray-500">
-                    {job.completed_at ? new Date(job.completed_at).toLocaleString() : '-'}
+                    {job.completed_at ? formatDate(job.completed_at) : '-'}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -340,6 +583,33 @@ export function BulkSendHistory() {
                           <Download className="h-4 w-4 mr-2" />
                           Export Results
                         </DropdownMenuItem>
+                        
+                        {job.status === 'running' && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => handleCancelCampaign(job.id)}
+                              className="text-red-600"
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Stop Campaign
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleUpdateCampaignStatus(job.id, 'failed')}
+                              className="text-orange-600"
+                            >
+                              <AlertCircle className="h-4 w-4 mr-2" />
+                              Mark as Failed (Stuck)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleUpdateCampaignStatus(job.id, 'completed')}
+                              className="text-green-600"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Mark as Completed
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -383,26 +653,73 @@ export function BulkSendHistory() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-xs text-gray-600">Total Contacts</p>
-                    <p className="text-lg font-bold">{selectedCampaign.campaign.total_contacts}</p>
+                    <p className="text-lg font-bold">{selectedCampaign.campaign.total_contacts || 0}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-600">Successful</p>
-                    <p className="text-lg font-bold text-green-600">{selectedCampaign.campaign.successful_sends}</p>
+                    <p className="text-lg font-bold text-green-600">{selectedCampaign.campaign.successful_sends || 0}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-600">Failed</p>
-                    <p className="text-lg font-bold text-red-600">{selectedCampaign.campaign.failed_sends}</p>
+                    <p className="text-lg font-bold text-red-600">{selectedCampaign.campaign.failed_sends || 0}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-600">Success Rate</p>
                     <p className="text-lg font-bold">
-                      {Math.round((selectedCampaign.campaign.successful_sends / selectedCampaign.campaign.total_contacts) * 100)}%
+                      {selectedCampaign.campaign.total_contacts && selectedCampaign.campaign.total_contacts > 0
+                        ? Math.round(((selectedCampaign.campaign.successful_sends || 0) / selectedCampaign.campaign.total_contacts) * 100)
+                        : 0}%
                     </p>
                   </div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-blue-200">
                   <p className="text-xs text-gray-600 mb-1">Message:</p>
                   <p className="text-sm text-gray-800 whitespace-pre-wrap">{selectedCampaign.campaign.message_content}</p>
+                  
+                  {/* Media Preview */}
+                  {selectedCampaign.campaign.media_url && (
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <p className="text-xs text-gray-600 mb-2">Media Attachment:</p>
+                      <div className="border rounded-lg p-2 bg-white">
+                        {selectedCampaign.campaign.media_type === 'image' ? (
+                          <img 
+                            src={selectedCampaign.campaign.media_url} 
+                            alt="Campaign media" 
+                            className="max-w-xs rounded"
+                            onError={(e) => {
+                              e.currentTarget.src = '/placeholder-image.png';
+                              e.currentTarget.alt = 'Media failed to load';
+                              e.currentTarget.className = 'max-w-xs rounded opacity-50';
+                            }}
+                          />
+                        ) : (
+                          <video 
+                            src={selectedCampaign.campaign.media_url} 
+                            controls 
+                            className="max-w-xs rounded"
+                          >
+                            Your browser does not support video playback.
+                          </video>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">
+                          <Badge variant="secondary" className="mr-2">
+                            {selectedCampaign.campaign.media_type === 'image' ? (
+                              <>
+                                <ImageIcon className="h-3 w-3 mr-1" />
+                                Image
+                              </>
+                            ) : (
+                              <>
+                                <VideoIcon className="h-3 w-3 mr-1" />
+                                Video
+                              </>
+                            )}
+                          </Badge>
+                          Media stored permanently in Supabase Storage
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Card>
 
@@ -492,6 +809,44 @@ export function BulkSendHistory() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Cleanup Confirmation Dialog */}
+      <AlertDialog open={showCleanupDialog} onOpenChange={setShowCleanupDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cleanup Stuck Campaigns?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will mark all campaigns that have been running for more than 24 hours as "failed". 
+              This action cannot be undone.
+              <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <p className="text-sm text-orange-800">
+                  <strong>Campaigns found:</strong> {jobs.filter(job => job.status === 'running').length} running
+                </p>
+                <p className="text-xs text-orange-600 mt-1">
+                  Only campaigns running for more than 24 hours will be affected.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCleaningUp}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleCleanupStuckCampaigns}
+              disabled={isCleaningUp}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {isCleaningUp ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Cleaning...
+                </>
+              ) : (
+                'Cleanup Stuck Campaigns'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 } 
